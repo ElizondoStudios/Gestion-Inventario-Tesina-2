@@ -1,0 +1,67 @@
+using API.Data;
+using API.Repositories.Implementations;
+using API.Repositories.Interfaces;
+using API.Services.Implementations;
+using API.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services to the container.
+// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+builder.Services.AddControllers();
+builder.Services.AddOpenApi();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new Microsoft.OpenApi.OpenApiInfo
+    {
+        Title = "ERP Gestión de Inventario API",
+        Version = "v1",
+        Description = "API para la gestión de inventario, usuarios, productos y movimientos."
+    });
+});
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Registro de repositorios en el contenedor de DI
+builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+builder.Services.AddScoped<IRolRepository, RolRepository>();
+builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+builder.Services.AddScoped<IModuloRepository, ModuloRepository>();
+builder.Services.AddScoped<IModuloCategoriaRepository, ModuloCategoriaRepository>();
+builder.Services.AddScoped<IRolModuloPermisoRepository, RolModuloPermisoRepository>();
+builder.Services.AddScoped<ISucursalRepository, SucursalRepository>();
+builder.Services.AddScoped<IUsuarioSucursalRepository, UsuarioSucursalRepository>();
+builder.Services.AddScoped<IProductoRepository, ProductoRepository>();
+builder.Services.AddScoped<IInventarioRepository, InventarioRepository>();
+builder.Services.AddScoped<IMovimientoInventarioRepository, MovimientoInventarioRepository>();
+
+// Registro de servicios en el contenedor de DI
+builder.Services.AddScoped<IRolService, RolService>();
+builder.Services.AddScoped<IUsuarioService, UsuarioService>();
+builder.Services.AddScoped<IModuloService, ModuloService>();
+builder.Services.AddScoped<ISucursalService, SucursalService>();
+builder.Services.AddScoped<IProductoService, ProductoService>();
+builder.Services.AddScoped<IInventarioService, InventarioService>();
+builder.Services.AddScoped<IMovimientoInventarioService, MovimientoInventarioService>();
+
+var app = builder.Build();
+
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "ERP Inventario v1");
+        c.RoutePrefix = string.Empty; // Swagger UI en la raíz
+    });
+}
+
+app.UseHttpsRedirection();
+
+app.MapControllers();
+
+app.Run();

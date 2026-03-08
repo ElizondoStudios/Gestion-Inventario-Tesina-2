@@ -1,0 +1,24 @@
+meta {
+  name: Actualizar tipo de movimiento
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/TiposMovimiento/1
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nombre": "Entrada",
+    "descripcion": "Entrada de producto al inventario (actualizado)",
+    "afectaStock": true,
+    "esTransferencia": false
+  }
+}

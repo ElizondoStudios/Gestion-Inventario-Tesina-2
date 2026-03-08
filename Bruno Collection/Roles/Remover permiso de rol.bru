@@ -1,0 +1,11 @@
+meta {
+  name: Remover permiso de rol
+  type: http
+  seq: 8
+}
+
+delete {
+  url: {{baseUrl}}/api/Roles/1/permisos/1
+  body: none
+  auth: none
+}

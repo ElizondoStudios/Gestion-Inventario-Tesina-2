@@ -1,0 +1,11 @@
+meta {
+  name: Obtener logs por rango de fecha
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/MovimientoLogs/fecha?fechaInicio=2026-01-01&fechaFin=2026-12-31
+  body: none
+  auth: none
+}

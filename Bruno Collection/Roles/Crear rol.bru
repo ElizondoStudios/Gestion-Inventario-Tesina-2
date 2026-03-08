@@ -1,0 +1,22 @@
+meta {
+  name: Crear rol
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/Roles
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nombre": "Administrador",
+    "descripcion": "Rol con acceso total al sistema"
+  }
+}

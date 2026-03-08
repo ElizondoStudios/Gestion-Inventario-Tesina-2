@@ -1,0 +1,24 @@
+meta {
+  name: Actualizar sucursal
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/Sucursales/1
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nombre": "Sucursal Centro Actualizada",
+    "direccion": "Av. Principal #200, Col. Centro",
+    "ciudad": "Monterrey",
+    "estado": "Nuevo León"
+  }
+}

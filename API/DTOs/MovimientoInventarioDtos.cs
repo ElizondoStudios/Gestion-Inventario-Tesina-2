@@ -18,7 +18,8 @@ public class MovimientoInventarioDto
     public string? NombreSucursalDestino { get; set; }
     public int IdUsuario { get; set; }
     public string? NombreUsuario { get; set; }
-    public string TipoMovimiento { get; set; } = null!;
+    public int IdTipoMovimiento { get; set; }
+    public string? NombreTipoMovimiento { get; set; }
     public int Cantidad { get; set; }
     public DateTime Fecha { get; set; }
     public string? Observaciones { get; set; }
@@ -48,9 +49,7 @@ public class CreateMovimientoDto
     public int IdUsuario { get; set; }
 
     [Required(ErrorMessage = "El tipo de movimiento es obligatorio.")]
-    [RegularExpression("^(Entrada|Salida|Transferencia)$",
-        ErrorMessage = "El tipo debe ser 'Entrada', 'Salida' o 'Transferencia'.")]
-    public string TipoMovimiento { get; set; } = null!;
+    public int IdTipoMovimiento { get; set; }
 
     [Required(ErrorMessage = "La cantidad es obligatoria.")]
     [Range(1, int.MaxValue, ErrorMessage = "La cantidad debe ser al menos 1.")]

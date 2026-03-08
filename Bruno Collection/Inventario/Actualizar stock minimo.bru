@@ -1,0 +1,21 @@
+meta {
+  name: Actualizar stock minimo
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/api/Inventario/1/stock-minimo
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "stockMinimo": 10
+  }
+}

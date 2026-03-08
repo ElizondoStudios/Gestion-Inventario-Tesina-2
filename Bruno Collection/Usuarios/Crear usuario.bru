@@ -1,0 +1,24 @@
+meta {
+  name: Crear usuario
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/Usuarios
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nombre": "Juan Pérez",
+    "correo": "juan.perez@empresa.com",
+    "contrasenia": "password123",
+    "idRol": 1
+  }
+}

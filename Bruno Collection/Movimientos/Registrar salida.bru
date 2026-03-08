@@ -1,0 +1,27 @@
+meta {
+  name: Registrar salida de inventario
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/Movimientos
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "idProducto": 1,
+    "idSucursalOrigen": 1,
+    "idSucursalDestino": null,
+    "idUsuario": 1,
+    "idTipoMovimiento": 2,
+    "cantidad": 5,
+    "observaciones": "Venta a cliente"
+  }
+}

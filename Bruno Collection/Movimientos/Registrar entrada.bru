@@ -1,0 +1,27 @@
+meta {
+  name: Registrar entrada de inventario
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/Movimientos
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "idProducto": 1,
+    "idSucursalOrigen": null,
+    "idSucursalDestino": 1,
+    "idUsuario": 1,
+    "idTipoMovimiento": 1,
+    "cantidad": 100,
+    "observaciones": "Compra inicial de producto"
+  }
+}

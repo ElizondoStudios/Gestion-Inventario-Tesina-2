@@ -23,9 +23,9 @@ public interface IMovimientoInventarioRepository : IRepository<MovimientoInventa
     Task<IEnumerable<MovimientoInventario>> GetByUsuarioAsync(int idUsuario);
 
     /// <summary>
-    /// Obtiene los movimientos filtrados por tipo (Entrada, Salida, Transferencia).
+    /// Obtiene los movimientos filtrados por tipo de movimiento.
     /// </summary>
-    Task<IEnumerable<MovimientoInventario>> GetByTipoAsync(string tipoMovimiento);
+    Task<IEnumerable<MovimientoInventario>> GetByTipoAsync(int idTipoMovimiento);
 
     /// <summary>
     /// Obtiene los movimientos en un rango de fechas.

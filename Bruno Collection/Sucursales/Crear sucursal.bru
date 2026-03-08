@@ -1,0 +1,24 @@
+meta {
+  name: Crear sucursal
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/Sucursales
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nombre": "Sucursal Centro",
+    "direccion": "Av. Principal #100, Col. Centro",
+    "ciudad": "Monterrey",
+    "estado": "Nuevo León"
+  }
+}

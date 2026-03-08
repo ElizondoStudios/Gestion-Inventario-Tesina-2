@@ -1,0 +1,22 @@
+meta {
+  name: Actualizar rol
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/Roles/1
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nombre": "Administrador General",
+    "descripcion": "Rol con acceso total actualizado"
+  }
+}

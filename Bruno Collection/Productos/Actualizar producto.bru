@@ -1,0 +1,24 @@
+meta {
+  name: Actualizar producto
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/Productos/1
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nombre": "Tornillo Hexagonal 1/4 Actualizado",
+    "descripcion": "Tornillo hexagonal de acero inoxidable 1/4 x 1.5 pulgada",
+    "numeroParte": "TRN-HEX-025",
+    "precio": 3.00
+  }
+}

@@ -36,6 +36,8 @@ builder.Services.AddScoped<IUsuarioSucursalRepository, UsuarioSucursalRepository
 builder.Services.AddScoped<IProductoRepository, ProductoRepository>();
 builder.Services.AddScoped<IInventarioRepository, InventarioRepository>();
 builder.Services.AddScoped<IMovimientoInventarioRepository, MovimientoInventarioRepository>();
+builder.Services.AddScoped<ITipoMovimientoRepository, TipoMovimientoRepository>();
+builder.Services.AddScoped<IMovimientoLogRepository, MovimientoLogRepository>();
 
 // Registro de servicios en el contenedor de DI
 builder.Services.AddScoped<IRolService, RolService>();
@@ -45,6 +47,8 @@ builder.Services.AddScoped<ISucursalService, SucursalService>();
 builder.Services.AddScoped<IProductoService, ProductoService>();
 builder.Services.AddScoped<IInventarioService, InventarioService>();
 builder.Services.AddScoped<IMovimientoInventarioService, MovimientoInventarioService>();
+builder.Services.AddScoped<ITipoMovimientoService, TipoMovimientoService>();
+builder.Services.AddScoped<IMovimientoLogService, MovimientoLogService>();
 
 var app = builder.Build();
 

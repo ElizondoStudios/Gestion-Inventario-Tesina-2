@@ -17,6 +17,7 @@ public class MovimientoInventarioRepository : Repository<MovimientoInventario>, 
     {
         return await _dbSet
             .Include(m => m.Usuario)
+            .Include(m => m.TipoMovimiento)
             .Include(m => m.SucursalOrigen)
             .Include(m => m.SucursalDestino)
             .Where(m => m.IdProducto == idProducto)
@@ -30,6 +31,7 @@ public class MovimientoInventarioRepository : Repository<MovimientoInventario>, 
         return await _dbSet
             .Include(m => m.Producto)
             .Include(m => m.Usuario)
+            .Include(m => m.TipoMovimiento)
             .Include(m => m.SucursalOrigen)
             .Include(m => m.SucursalDestino)
             .Where(m => m.IdSucursalOrigen == idSucursal || m.IdSucursalDestino == idSucursal)
@@ -42,6 +44,7 @@ public class MovimientoInventarioRepository : Repository<MovimientoInventario>, 
     {
         return await _dbSet
             .Include(m => m.Producto)
+            .Include(m => m.TipoMovimiento)
             .Include(m => m.SucursalOrigen)
             .Include(m => m.SucursalDestino)
             .Where(m => m.IdUsuario == idUsuario)
@@ -50,14 +53,15 @@ public class MovimientoInventarioRepository : Repository<MovimientoInventario>, 
     }
 
     /// <inheritdoc />
-    public async Task<IEnumerable<MovimientoInventario>> GetByTipoAsync(string tipoMovimiento)
+    public async Task<IEnumerable<MovimientoInventario>> GetByTipoAsync(int idTipoMovimiento)
     {
         return await _dbSet
             .Include(m => m.Producto)
             .Include(m => m.Usuario)
+            .Include(m => m.TipoMovimiento)
             .Include(m => m.SucursalOrigen)
             .Include(m => m.SucursalDestino)
-            .Where(m => m.TipoMovimiento == tipoMovimiento)
+            .Where(m => m.IdTipoMovimiento == idTipoMovimiento)
             .OrderByDescending(m => m.Fecha)
             .ToListAsync();
     }
@@ -68,6 +72,7 @@ public class MovimientoInventarioRepository : Repository<MovimientoInventario>, 
         return await _dbSet
             .Include(m => m.Producto)
             .Include(m => m.Usuario)
+            .Include(m => m.TipoMovimiento)
             .Include(m => m.SucursalOrigen)
             .Include(m => m.SucursalDestino)
             .Where(m => m.Fecha >= fechaInicio && m.Fecha <= fechaFin)
@@ -81,6 +86,7 @@ public class MovimientoInventarioRepository : Repository<MovimientoInventario>, 
         return await _dbSet
             .Include(m => m.Producto)
             .Include(m => m.Usuario)
+            .Include(m => m.TipoMovimiento)
             .Include(m => m.SucursalOrigen)
             .Include(m => m.SucursalDestino)
             .FirstOrDefaultAsync(m => m.IdMovimiento == idMovimiento);

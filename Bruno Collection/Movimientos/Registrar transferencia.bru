@@ -1,0 +1,27 @@
+meta {
+  name: Registrar transferencia entre sucursales
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/Movimientos
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "idProducto": 1,
+    "idSucursalOrigen": 1,
+    "idSucursalDestino": 2,
+    "idUsuario": 1,
+    "idTipoMovimiento": 3,
+    "cantidad": 20,
+    "observaciones": "Transferencia de stock entre sucursales"
+  }
+}

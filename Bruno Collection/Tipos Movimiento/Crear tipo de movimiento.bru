@@ -1,0 +1,24 @@
+meta {
+  name: Crear tipo de movimiento
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/TiposMovimiento
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nombre": "Entrada",
+    "descripcion": "Entrada de producto al inventario",
+    "afectaStock": true,
+    "esTransferencia": false
+  }
+}

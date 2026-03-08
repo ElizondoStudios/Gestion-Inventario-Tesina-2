@@ -14,4 +14,5 @@ public class Usuario
     public Rol Rol { get; set; } = null!;
     public ICollection<UsuarioSucursal> UsuarioSucursales { get; set; } = [];
     public ICollection<MovimientoInventario> MovimientosInventario { get; set; } = [];
+    public ICollection<MovimientoLog> MovimientoLogs { get; set; } = [];
 }

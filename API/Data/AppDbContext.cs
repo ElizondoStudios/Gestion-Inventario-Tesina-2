@@ -17,6 +17,8 @@ public class AppDbContext : DbContext
     public DbSet<Producto> Productos => Set<Producto>();
     public DbSet<Inventario> Inventarios => Set<Inventario>();
     public DbSet<MovimientoInventario> MovimientosInventario => Set<MovimientoInventario>();
+    public DbSet<TipoMovimiento> TiposMovimiento => Set<TipoMovimiento>();
+    public DbSet<MovimientoLog> MovimientoLogs => Set<MovimientoLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -154,7 +156,6 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<MovimientoInventario>(entity =>
         {
             entity.HasKey(e => e.IdMovimiento);
-            entity.Property(e => e.TipoMovimiento).IsRequired().HasMaxLength(50);
             entity.Property(e => e.Cantidad).IsRequired();
             entity.Property(e => e.Fecha).IsRequired();
             entity.Property(e => e.Observaciones).HasMaxLength(255);
@@ -169,6 +170,11 @@ public class AppDbContext : DbContext
                   .HasForeignKey(e => e.IdUsuario)
                   .OnDelete(DeleteBehavior.Restrict);
 
+            entity.HasOne(e => e.TipoMovimiento)
+                  .WithMany(t => t.MovimientosInventario)
+                  .HasForeignKey(e => e.IdTipoMovimiento)
+                  .OnDelete(DeleteBehavior.Restrict);
+
             entity.HasOne(e => e.SucursalOrigen)
                   .WithMany(s => s.MovimientosOrigen)
                   .HasForeignKey(e => e.IdSucursalOrigen)
@@ -177,6 +183,36 @@ public class AppDbContext : DbContext
             entity.HasOne(e => e.SucursalDestino)
                   .WithMany(s => s.MovimientosDestino)
                   .HasForeignKey(e => e.IdSucursalDestino)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ─── TipoMovimiento ───
+        modelBuilder.Entity<TipoMovimiento>(entity =>
+        {
+            entity.HasKey(e => e.IdTipoMovimiento);
+            entity.Property(e => e.Nombre).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Descripcion).HasMaxLength(255);
+            entity.Property(e => e.AfectaStock).IsRequired();
+            entity.Property(e => e.EsTransferencia).IsRequired();
+        });
+
+        // ─── MovimientoLog ───
+        modelBuilder.Entity<MovimientoLog>(entity =>
+        {
+            entity.HasKey(e => e.IdLog);
+            entity.Property(e => e.Accion).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Fecha).IsRequired();
+            entity.Property(e => e.ValorAnterior).HasColumnType("nvarchar(max)");
+            entity.Property(e => e.ValorNuevo).HasColumnType("nvarchar(max)");
+
+            entity.HasOne(e => e.MovimientoInventario)
+                  .WithMany(m => m.MovimientoLogs)
+                  .HasForeignKey(e => e.IdMovimiento)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Usuario)
+                  .WithMany(u => u.MovimientoLogs)
+                  .HasForeignKey(e => e.IdUsuario)
                   .OnDelete(DeleteBehavior.Restrict);
         });
     }

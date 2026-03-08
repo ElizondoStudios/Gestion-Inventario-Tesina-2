@@ -1,0 +1,24 @@
+meta {
+  name: Asignar permiso a rol
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/Roles/1/permisos
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "idModuloCategoria": 1,
+    "puedeLeer": true,
+    "puedeEscribir": true,
+    "puedeEliminar": false
+  }
+}

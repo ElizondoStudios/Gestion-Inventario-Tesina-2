@@ -1,0 +1,22 @@
+meta {
+  name: Actualizar categoria
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/Modulos/categorias/1
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nombre": "Gestión de Usuarios Actualizada",
+    "descripcion": "Descripción actualizada de la categoría"
+  }
+}

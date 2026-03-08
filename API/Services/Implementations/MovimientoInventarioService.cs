@@ -17,19 +17,25 @@ public class MovimientoInventarioService : IMovimientoInventarioService
     private readonly IProductoRepository _productoRepo;
     private readonly ISucursalRepository _sucursalRepo;
     private readonly IUsuarioRepository _usuarioRepo;
+    private readonly ITipoMovimientoRepository _tipoMovimientoRepo;
+    private readonly IMovimientoLogRepository _movimientoLogRepo;
 
     public MovimientoInventarioService(
         IMovimientoInventarioRepository movimientoRepo,
         IInventarioRepository inventarioRepo,
         IProductoRepository productoRepo,
         ISucursalRepository sucursalRepo,
-        IUsuarioRepository usuarioRepo)
+        IUsuarioRepository usuarioRepo,
+        ITipoMovimientoRepository tipoMovimientoRepo,
+        IMovimientoLogRepository movimientoLogRepo)
     {
         _movimientoRepo = movimientoRepo;
         _inventarioRepo = inventarioRepo;
         _productoRepo = productoRepo;
         _sucursalRepo = sucursalRepo;
         _usuarioRepo = usuarioRepo;
+        _tipoMovimientoRepo = tipoMovimientoRepo;
+        _movimientoLogRepo = movimientoLogRepo;
     }
 
     public async Task<IEnumerable<MovimientoInventarioDto>> GetAllAsync()
@@ -78,20 +84,24 @@ public class MovimientoInventarioService : IMovimientoInventarioService
         var usuario = await _usuarioRepo.GetByIdAsync(dto.IdUsuario)
             ?? throw new InvalidOperationException("El usuario especificado no existe.");
 
+        // Validar que el tipo de movimiento exista
+        var tipoMovimiento = await _tipoMovimientoRepo.GetByIdAsync(dto.IdTipoMovimiento)
+            ?? throw new InvalidOperationException("El tipo de movimiento especificado no existe.");
+
         // Validar reglas por tipo de movimiento
-        switch (dto.TipoMovimiento)
+        if (tipoMovimiento.EsTransferencia)
         {
-            case "Entrada":
-                await ProcesarEntradaAsync(dto);
-                break;
-            case "Salida":
-                await ProcesarSalidaAsync(dto);
-                break;
-            case "Transferencia":
-                await ProcesarTransferenciaAsync(dto);
-                break;
-            default:
-                throw new InvalidOperationException("Tipo de movimiento no válido.");
+            await ProcesarTransferenciaAsync(dto);
+        }
+        else if (tipoMovimiento.AfectaStock && dto.IdSucursalDestino is not null)
+        {
+            // Entrada: suma stock en destino
+            await ProcesarEntradaAsync(dto);
+        }
+        else if (tipoMovimiento.AfectaStock && dto.IdSucursalOrigen is not null)
+        {
+            // Salida: resta stock en origen
+            await ProcesarSalidaAsync(dto);
         }
 
         // Crear el registro del movimiento
@@ -101,7 +111,7 @@ public class MovimientoInventarioService : IMovimientoInventarioService
             IdSucursalOrigen = dto.IdSucursalOrigen,
             IdSucursalDestino = dto.IdSucursalDestino,
             IdUsuario = dto.IdUsuario,
-            TipoMovimiento = dto.TipoMovimiento,
+            IdTipoMovimiento = dto.IdTipoMovimiento,
             Cantidad = dto.Cantidad,
             Fecha = DateTime.Now,
             Observaciones = dto.Observaciones
@@ -109,6 +119,19 @@ public class MovimientoInventarioService : IMovimientoInventarioService
 
         await _movimientoRepo.AddAsync(movimiento);
         await _movimientoRepo.SaveChangesAsync();
+
+        // Registrar log de auditoría (Creación)
+        var log = new MovimientoLog
+        {
+            IdMovimiento = movimiento.IdMovimiento,
+            IdUsuario = dto.IdUsuario,
+            Accion = "Creación",
+            Fecha = DateTime.Now,
+            ValorAnterior = null,
+            ValorNuevo = $"Producto:{dto.IdProducto}, Cantidad:{dto.Cantidad}, TipoMovimiento:{tipoMovimiento.Nombre}"
+        };
+        await _movimientoLogRepo.AddAsync(log);
+        await _movimientoLogRepo.SaveChangesAsync();
 
         // Retornar con detalles
         var result = await _movimientoRepo.GetWithDetailsAsync(movimiento.IdMovimiento);
@@ -243,7 +266,8 @@ public class MovimientoInventarioService : IMovimientoInventarioService
         NombreSucursalDestino = m.SucursalDestino?.Nombre,
         IdUsuario = m.IdUsuario,
         NombreUsuario = m.Usuario?.Nombre,
-        TipoMovimiento = m.TipoMovimiento,
+        IdTipoMovimiento = m.IdTipoMovimiento,
+        NombreTipoMovimiento = m.TipoMovimiento?.Nombre,
         Cantidad = m.Cantidad,
         Fecha = m.Fecha,
         Observaciones = m.Observaciones

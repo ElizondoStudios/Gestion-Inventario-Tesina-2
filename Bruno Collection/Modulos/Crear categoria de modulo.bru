@@ -1,0 +1,22 @@
+meta {
+  name: Crear categoria de modulo
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/Modulos/1/categorias
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nombre": "Gestión de Usuarios",
+    "descripcion": "Categoría para administrar usuarios del sistema"
+  }
+}

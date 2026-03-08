@@ -1,0 +1,24 @@
+meta {
+  name: Crear producto
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/Productos
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nombre": "Tornillo Hexagonal 1/4",
+    "descripcion": "Tornillo hexagonal de acero inoxidable 1/4 x 1 pulgada",
+    "numeroParte": "TRN-HEX-025",
+    "precio": 2.50
+  }
+}

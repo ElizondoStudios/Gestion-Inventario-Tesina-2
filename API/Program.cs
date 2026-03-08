@@ -49,6 +49,7 @@ builder.Services.AddScoped<IInventarioService, InventarioService>();
 builder.Services.AddScoped<IMovimientoInventarioService, MovimientoInventarioService>();
 builder.Services.AddScoped<ITipoMovimientoService, TipoMovimientoService>();
 builder.Services.AddScoped<IMovimientoLogService, MovimientoLogService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
 
 var app = builder.Build();
 

@@ -19,6 +19,16 @@ public class InventarioController : ControllerBase
     }
 
     /// <summary>
+    /// Obtiene todo el inventario.
+    /// </summary>
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<InventarioDto>>> GetAll()
+    {
+        var inventario = await _inventarioService.GetAllAsync();
+        return Ok(inventario);
+    }
+
+    /// <summary>
     /// Obtiene el inventario de una sucursal específica.
     /// </summary>
     [HttpGet("sucursal/{idSucursal}")]

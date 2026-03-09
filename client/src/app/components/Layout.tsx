@@ -75,7 +75,7 @@ export function Layout() {
                 <p className="text-sm font-medium text-gray-900 truncate">
                   {user?.nombre}
                 </p>
-                <p className="text-xs text-gray-500 truncate">{user?.rol}</p>
+                <p className="text-xs text-gray-500 truncate">{user?.nombreRol}</p>
               </div>
             </div>
           </div>

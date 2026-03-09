@@ -1,95 +1,109 @@
-import { useState } from 'react';
-import { usuarios as usuariosData, perfiles, sucursales } from '../data/mockData';
-import { UserPlus, Search, Edit2, Trash2, UserCheck, UserX } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { UserPlus, Search, Edit2, Trash2, UserCheck, UserX, Loader2 } from 'lucide-react';
+import { usuariosApi, rolesApi } from '../services/api';
+import type { UsuarioDto, RolDto } from '../types';
 
 export function Usuarios() {
-  const [usuarios, setUsuarios] = useState(usuariosData);
+  const [usuarios, setUsuarios] = useState<UsuarioDto[]>([]);
+  const [roles, setRoles] = useState<RolDto[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [editingUser, setEditingUser] = useState<any>(null);
+  const [editingUser, setEditingUser] = useState<UsuarioDto | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     nombre: '',
-    email: '',
-    password: '',
-    rol: perfiles[0].nombre,
-    sucursal: sucursales[0].nombre,
+    correo: '',
+    contrasenia: '',
+    idRol: 0,
   });
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [usrs, rls] = await Promise.all([
+        usuariosApi.getAll(),
+        rolesApi.getAll(),
+      ]);
+      setUsuarios(usrs);
+      setRoles(rls);
+    } catch (err) {
+      console.error('Error al cargar datos:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredUsuarios = usuarios.filter(
     (user) =>
       user.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase())
+      user.correo.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (editingUser) {
-      // Actualizar usuario existente
-      setUsuarios(
-        usuarios.map((u) =>
-          u.id === editingUser.id
-            ? {
-                ...u,
-                nombre: formData.nombre,
-                email: formData.email,
-                rol: formData.rol,
-                sucursal: formData.sucursal,
-              }
-            : u
-        )
-      );
-    } else {
-      // Crear nuevo usuario
-      const newUser = {
-        id: String(usuarios.length + 1),
-        nombre: formData.nombre,
-        email: formData.email,
-        password: formData.password,
-        rol: formData.rol,
-        sucursal: formData.sucursal,
-        activo: true,
-        fechaCreacion: new Date().toISOString().split('T')[0],
-      };
-      setUsuarios([...usuarios, newUser]);
-    }
+    setSaving(true);
 
-    // Reset
-    setShowModal(false);
-    setEditingUser(null);
-    setFormData({
-      nombre: '',
-      email: '',
-      password: '',
-      rol: perfiles[0].nombre,
-      sucursal: sucursales[0].nombre,
-    });
+    try {
+      if (editingUser) {
+        await usuariosApi.update(editingUser.idUsuario, {
+          nombre: formData.nombre,
+          correo: formData.correo,
+          idRol: formData.idRol,
+        });
+      } else {
+        await usuariosApi.create({
+          nombre: formData.nombre,
+          correo: formData.correo,
+          contrasenia: formData.contrasenia,
+          idRol: formData.idRol,
+        });
+      }
+
+      setShowModal(false);
+      setEditingUser(null);
+      await loadData();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al guardar');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleEdit = (user: any) => {
+  const handleEdit = (user: UsuarioDto) => {
     setEditingUser(user);
     setFormData({
       nombre: user.nombre,
-      email: user.email,
-      password: '',
-      rol: user.rol,
-      sucursal: user.sucursal,
+      correo: user.correo,
+      contrasenia: '',
+      idRol: user.idRol,
     });
     setShowModal(true);
   };
 
-  const handleToggleActive = (userId: string) => {
-    setUsuarios(
-      usuarios.map((u) => (u.id === userId ? { ...u, activo: !u.activo } : u))
-    );
-  };
-
-  const handleDelete = (userId: string) => {
-    if (confirm('¿Estás seguro de que deseas eliminar este usuario?')) {
-      setUsuarios(usuarios.filter((u) => u.id !== userId));
+  const handleDelete = async (userId: number) => {
+    if (confirm('¿Estás seguro de que deseas desactivar este usuario?')) {
+      try {
+        await usuariosApi.desactivar(userId);
+        await loadData();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Error al eliminar');
+      }
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -106,10 +120,9 @@ export function Usuarios() {
             setEditingUser(null);
             setFormData({
               nombre: '',
-              email: '',
-              password: '',
-              rol: perfiles[0].nombre,
-              sucursal: sucursales[0].nombre,
+              correo: '',
+              contrasenia: '',
+              idRol: roles[0]?.idRol ?? 0,
             });
             setShowModal(true);
           }}
@@ -126,7 +139,7 @@ export function Usuarios() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
           <input
             type="text"
-            placeholder="Buscar por nombre o email..."
+            placeholder="Buscar por nombre o correo..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
@@ -147,9 +160,6 @@ export function Usuarios() {
                   Rol
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Sucursal
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Estado
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -159,7 +169,7 @@ export function Usuarios() {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {filteredUsuarios.map((usuario) => (
-                <tr key={usuario.id} className="hover:bg-gray-50">
+                <tr key={usuario.idUsuario} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -171,22 +181,18 @@ export function Usuarios() {
                         <div className="font-medium text-gray-900">
                           {usuario.nombre}
                         </div>
-                        <div className="text-sm text-gray-500">{usuario.email}</div>
+                        <div className="text-sm text-gray-500">{usuario.correo}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-700 rounded-full">
-                      {usuario.rol}
+                      {usuario.nombreRol ?? 'Sin rol'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {usuario.sucursal}
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() => handleToggleActive(usuario.id)}
-                      className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
+                    <span
+                      className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full w-fit ${
                         usuario.activo
                           ? 'bg-green-100 text-green-700'
                           : 'bg-red-100 text-red-700'
@@ -203,7 +209,7 @@ export function Usuarios() {
                           Inactivo
                         </>
                       )}
-                    </button>
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
@@ -213,7 +219,7 @@ export function Usuarios() {
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => handleDelete(usuario.id)}
+                      onClick={() => handleDelete(usuario.idUsuario)}
                       className="text-red-600 hover:text-red-900"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -251,13 +257,13 @@ export function Usuarios() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
+                  Correo Electrónico
                 </label>
                 <input
                   type="email"
-                  value={formData.email}
+                  value={formData.correo}
                   onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
+                    setFormData({ ...formData, correo: e.target.value })
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
                   required
@@ -271,12 +277,13 @@ export function Usuarios() {
                   </label>
                   <input
                     type="password"
-                    value={formData.password}
+                    value={formData.contrasenia}
                     onChange={(e) =>
-                      setFormData({ ...formData, password: e.target.value })
+                      setFormData({ ...formData, contrasenia: e.target.value })
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
                     required
+                    minLength={6}
                   />
                 </div>
               )}
@@ -286,34 +293,15 @@ export function Usuarios() {
                   Rol
                 </label>
                 <select
-                  value={formData.rol}
+                  value={formData.idRol}
                   onChange={(e) =>
-                    setFormData({ ...formData, rol: e.target.value })
+                    setFormData({ ...formData, idRol: Number(e.target.value) })
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
                 >
-                  {perfiles.map((perfil) => (
-                    <option key={perfil.id} value={perfil.nombre}>
-                      {perfil.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Sucursal
-                </label>
-                <select
-                  value={formData.sucursal}
-                  onChange={(e) =>
-                    setFormData({ ...formData, sucursal: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
-                >
-                  {sucursales.map((sucursal) => (
-                    <option key={sucursal.id} value={sucursal.nombre}>
-                      {sucursal.nombre}
+                  {roles.map((rol) => (
+                    <option key={rol.idRol} value={rol.idRol}>
+                      {rol.nombre}
                     </option>
                   ))}
                 </select>
@@ -332,9 +320,10 @@ export function Usuarios() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-teal-300 hover:bg-teal-400 text-white rounded-lg transition"
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 bg-teal-300 hover:bg-teal-400 text-white rounded-lg transition disabled:opacity-50"
                 >
-                  {editingUser ? 'Actualizar' : 'Crear'}
+                  {saving ? 'Guardando...' : editingUser ? 'Actualizar' : 'Crear'}
                 </button>
               </div>
             </form>

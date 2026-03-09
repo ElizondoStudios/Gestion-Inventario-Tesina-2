@@ -1,9 +1,10 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
-import { usuarios, Usuario } from '../data/mockData';
+import { authApi } from '../services/api';
+import type { LoginResponseDto } from '../types';
 
 interface AuthContextType {
-  user: Usuario | null;
-  login: (email: string, password: string) => boolean;
+  user: LoginResponseDto | null;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -11,25 +12,21 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<Usuario | null>(() => {
+  const [user, setUser] = useState<LoginResponseDto | null>(() => {
     // Verificar si hay una sesión guardada
     const savedUser = localStorage.getItem('user');
     return savedUser ? JSON.parse(savedUser) : null;
   });
 
-  const login = (email: string, password: string): boolean => {
-    const foundUser = usuarios.find(
-      (u) => u.email === email && u.password === password && u.activo
-    );
-
-    if (foundUser) {
-      const userWithoutPassword = { ...foundUser };
-      delete userWithoutPassword.password;
-      setUser(userWithoutPassword);
-      localStorage.setItem('user', JSON.stringify(userWithoutPassword));
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const result = await authApi.login({ correo: email, contrasenia: password });
+      setUser(result);
+      localStorage.setItem('user', JSON.stringify(result));
       return true;
+    } catch {
+      return false;
     }
-    return false;
   };
 
   const logout = () => {

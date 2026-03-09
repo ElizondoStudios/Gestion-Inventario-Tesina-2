@@ -16,6 +16,12 @@ public class InventarioService : IInventarioService
         _inventarioRepo = inventarioRepo;
     }
 
+    public async Task<IEnumerable<InventarioDto>> GetAllAsync()
+    {
+        var inventarios = await _inventarioRepo.GetAllAsync();
+        return inventarios.Select(MapToDto);
+    }
+
     public async Task<IEnumerable<InventarioDto>> GetBySucursalAsync(int idSucursal)
     {
         var inventarios = await _inventarioRepo.GetBySucursalAsync(idSucursal);

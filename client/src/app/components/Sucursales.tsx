@@ -1,20 +1,38 @@
-import { useState } from 'react';
-import { sucursales as sucursalesData } from '../data/mockData';
-import { Building2, Plus, Search, Edit2, Trash2, MapPin, Phone, User } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { sucursalesApi } from '../services/api';
+import type { SucursalDto } from '../types';
+import { Building2, Plus, Search, Edit2, Trash2, MapPin, Loader2 } from 'lucide-react';
 
 export function Sucursales() {
-  const [sucursales, setSucursales] = useState(sucursalesData);
+  const [sucursales, setSucursales] = useState<SucursalDto[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [editingSucursal, setEditingSucursal] = useState<any>(null);
+  const [editingSucursal, setEditingSucursal] = useState<SucursalDto | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     nombre: '',
     direccion: '',
     ciudad: '',
-    telefono: '',
-    gerente: '',
+    estado: '',
   });
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const data = await sucursalesApi.getAll();
+      setSucursales(data);
+    } catch (err) {
+      console.error('Error al cargar sucursales:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredSucursales = sucursales.filter(
     (sucursal) =>
@@ -22,27 +40,26 @@ export function Sucursales() {
       sucursal.ciudad.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
 
-    if (editingSucursal) {
-      setSucursales(
-        sucursales.map((s) =>
-          s.id === editingSucursal.id ? { ...s, ...formData } : s
-        )
-      );
-    } else {
-      const newSucursal = {
-        id: String(sucursales.length + 1),
-        ...formData,
-        activa: true,
-      };
-      setSucursales([...sucursales, newSucursal]);
+    try {
+      if (editingSucursal) {
+        await sucursalesApi.update(editingSucursal.idSucursal, formData);
+      } else {
+        await sucursalesApi.create(formData);
+      }
+
+      setShowModal(false);
+      setEditingSucursal(null);
+      resetForm();
+      await loadData();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al guardar');
+    } finally {
+      setSaving(false);
     }
-
-    setShowModal(false);
-    setEditingSucursal(null);
-    resetForm();
   };
 
   const resetForm = () => {
@@ -50,36 +67,39 @@ export function Sucursales() {
       nombre: '',
       direccion: '',
       ciudad: '',
-      telefono: '',
-      gerente: '',
+      estado: '',
     });
   };
 
-  const handleEdit = (sucursal: any) => {
+  const handleEdit = (sucursal: SucursalDto) => {
     setEditingSucursal(sucursal);
     setFormData({
       nombre: sucursal.nombre,
       direccion: sucursal.direccion,
       ciudad: sucursal.ciudad,
-      telefono: sucursal.telefono,
-      gerente: sucursal.gerente,
+      estado: sucursal.estado,
     });
     setShowModal(true);
   };
 
-  const handleDelete = (sucursalId: string) => {
-    if (confirm('¿Estás seguro de que deseas eliminar esta sucursal?')) {
-      setSucursales(sucursales.filter((s) => s.id !== sucursalId));
+  const handleDelete = async (sucursalId: number) => {
+    if (confirm('¿Estás seguro de que deseas desactivar esta sucursal?')) {
+      try {
+        await sucursalesApi.desactivar(sucursalId);
+        await loadData();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Error al eliminar');
+      }
     }
   };
 
-  const handleToggleActive = (sucursalId: string) => {
-    setSucursales(
-      sucursales.map((s) =>
-        s.id === sucursalId ? { ...s, activa: !s.activa } : s
-      )
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
+      </div>
     );
-  };
+  }
 
   return (
     <div className="space-y-6">
@@ -122,7 +142,7 @@ export function Sucursales() {
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredSucursales.map((sucursal) => (
           <div
-            key={sucursal.id}
+            key={sucursal.idSucursal}
             className="bg-white rounded-xl shadow-sm border border-gray-100 p-6"
           >
             <div className="flex items-start justify-between mb-4">
@@ -132,16 +152,15 @@ export function Sucursales() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">{sucursal.nombre}</h3>
-                  <button
-                    onClick={() => handleToggleActive(sucursal.id)}
-                    className={`text-xs px-2 py-1 rounded-full mt-1 ${
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full mt-1 inline-block ${
                       sucursal.activa
                         ? 'bg-green-100 text-green-700'
                         : 'bg-red-100 text-red-700'
                     }`}
                   >
                     {sucursal.activa ? 'Activa' : 'Inactiva'}
-                  </button>
+                  </span>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -152,7 +171,7 @@ export function Sucursales() {
                   <Edit2 className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => handleDelete(sucursal.id)}
+                  onClick={() => handleDelete(sucursal.idSucursal)}
                   className="text-red-600 hover:text-red-900"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -165,16 +184,8 @@ export function Sucursales() {
                 <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <div>
                   <p>{sucursal.direccion}</p>
-                  <p>{sucursal.ciudad}</p>
+                  <p>{sucursal.ciudad}, {sucursal.estado}</p>
                 </div>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <Phone className="w-4 h-4 flex-shrink-0" />
-                <p>{sucursal.telefono}</p>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <User className="w-4 h-4 flex-shrink-0" />
-                <p>Gerente: {sucursal.gerente}</p>
               </div>
             </div>
           </div>
@@ -243,28 +254,13 @@ export function Sucursales() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Teléfono
-                </label>
-                <input
-                  type="tel"
-                  value={formData.telefono}
-                  onChange={(e) =>
-                    setFormData({ ...formData, telefono: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Gerente
+                  Estado
                 </label>
                 <input
                   type="text"
-                  value={formData.gerente}
+                  value={formData.estado}
                   onChange={(e) =>
-                    setFormData({ ...formData, gerente: e.target.value })
+                    setFormData({ ...formData, estado: e.target.value })
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
                   required
@@ -284,9 +280,10 @@ export function Sucursales() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-teal-300 hover:bg-teal-400 text-white rounded-lg transition"
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 bg-teal-300 hover:bg-teal-400 text-white rounded-lg transition disabled:opacity-50"
                 >
-                  {editingSucursal ? 'Actualizar' : 'Crear'}
+                  {saving ? 'Guardando...' : editingSucursal ? 'Actualizar' : 'Crear'}
                 </button>
               </div>
             </form>

@@ -7,6 +7,7 @@ namespace API.Services.Interfaces;
 /// </summary>
 public interface IInventarioService
 {
+    Task<IEnumerable<InventarioDto>> GetAllAsync();
     Task<IEnumerable<InventarioDto>> GetBySucursalAsync(int idSucursal);
     Task<IEnumerable<InventarioDto>> GetByProductoAsync(int idProducto);
     Task<IEnumerable<InventarioDto>> GetAlertasStockBajoAsync();

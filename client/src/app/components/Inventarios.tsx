@@ -1,9 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  productos as productosData,
-  sucursales,
-  movimientos as movimientosData,
-} from '../data/mockData';
+  inventarioApi,
+  productosApi,
+  movimientosApi,
+  sucursalesApi,
+  tiposMovimientoApi,
+} from '../services/api';
+import type {
+  InventarioDto,
+  ProductoDto,
+  MovimientoInventarioDto,
+  SucursalDto,
+  TipoMovimientoDto,
+} from '../types';
 import {
   Package,
   Plus,
@@ -15,158 +24,199 @@ import {
   ArrowDownCircle,
   ArrowRightLeft,
   XCircle,
+  Loader2,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export function Inventarios() {
-  const [productos, setProductos] = useState(productosData);
-  const [movimientos, setMovimientos] = useState(movimientosData);
+  const { user } = useAuth();
+  const [inventario, setInventario] = useState<InventarioDto[]>([]);
+  const [productos, setProductos] = useState<ProductoDto[]>([]);
+  const [movimientos, setMovimientos] = useState<MovimientoInventarioDto[]>([]);
+  const [sucursales, setSucursales] = useState<SucursalDto[]>([]);
+  const [tiposMovimiento, setTiposMovimiento] = useState<TipoMovimientoDto[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showProductModal, setShowProductModal] = useState(false);
   const [showMovementModal, setShowMovementModal] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [editingProduct, setEditingProduct] = useState<ProductoDto | null>(null);
   const [activeTab, setActiveTab] = useState<'productos' | 'movimientos'>('productos');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [productForm, setProductForm] = useState({
     nombre: '',
     descripcion: '',
-    noParte: '',
+    numeroParte: '',
     precio: 0,
-    stock: 0,
-    minimo: 0,
-    sucursal: sucursales[0].nombre,
-    categoria: 'Electrónica',
   });
 
   const [movementForm, setMovementForm] = useState({
-    tipo: 'entrada' as 'entrada' | 'salida' | 'transferencia' | 'merma',
-    producto: '',
+    idTipoMovimiento: 0,
+    idProducto: 0,
     cantidad: 0,
-    sucursal: sucursales[0].nombre,
-    origen: '',
-    destino: '',
+    idSucursalOrigen: 0,
+    idSucursalDestino: 0,
+    observaciones: '',
   });
 
-  const filteredProductos = productos.filter(
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [inv, prods, movs, sucs, tipos] = await Promise.all([
+        inventarioApi.getAll(),
+        productosApi.getAll(),
+        movimientosApi.getAll(),
+        sucursalesApi.getAll(),
+        tiposMovimientoApi.getAll(),
+      ]);
+      setInventario(inv);
+      setProductos(prods);
+      setMovimientos(movs);
+      setSucursales(sucs);
+      setTiposMovimiento(tipos);
+    } catch (err) {
+      console.error('Error al cargar datos:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Combinar productos con datos de inventario
+  const productosConStock = productos.map((p) => {
+    const invItems = inventario.filter((i) => i.idProducto === p.idProducto);
+    const stockTotal = invItems.reduce((sum, i) => sum + i.stockActual, 0);
+    const stockMinimo = invItems.length > 0 ? Math.min(...invItems.map((i) => i.stockMinimo)) : 0;
+    return { ...p, stock: stockTotal, minimo: stockMinimo, invItems };
+  });
+
+  const filteredProductos = productosConStock.filter(
     (p) =>
       p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.noParte.toLowerCase().includes(searchTerm.toLowerCase())
+      p.numeroParte.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleProductSubmit = (e: React.FormEvent) => {
+  const alertasInventario = inventario.filter((i) => i.stockBajo);
+
+  const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
 
-    if (editingProduct) {
-      setProductos(
-        productos.map((p) =>
-          p.id === editingProduct.id ? { ...p, ...productForm } : p
-        )
-      );
-    } else {
-      const newProduct = {
-        id: String(productos.length + 1),
-        ...productForm,
-      };
-      setProductos([...productos, newProduct]);
+    try {
+      if (editingProduct) {
+        await productosApi.update(editingProduct.idProducto, productForm);
+      } else {
+        await productosApi.create(productForm);
+      }
+
+      setShowProductModal(false);
+      setEditingProduct(null);
+      resetProductForm();
+      await loadData();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al guardar producto');
+    } finally {
+      setSaving(false);
     }
-
-    setShowProductModal(false);
-    setEditingProduct(null);
-    resetProductForm();
   };
 
   const resetProductForm = () => {
     setProductForm({
       nombre: '',
       descripcion: '',
-      noParte: '',
+      numeroParte: '',
       precio: 0,
-      stock: 0,
-      minimo: 0,
-      sucursal: sucursales[0].nombre,
-      categoria: 'Electrónica',
     });
   };
 
-  const handleMovementSubmit = (e: React.FormEvent) => {
+  const handleMovementSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
 
-    const newMovement = {
-      id: String(movimientos.length + 1),
-      tipo: movementForm.tipo,
-      producto: movementForm.producto,
-      cantidad: movementForm.cantidad,
-      fecha: new Date().toISOString().split('T')[0],
-      usuario: 'Usuario Actual',
-      sucursal: movementForm.sucursal,
-      ...(movementForm.tipo === 'transferencia' && {
-        origen: movementForm.origen,
-        destino: movementForm.destino,
-      }),
-    };
+    try {
+      const tipoSel = tiposMovimiento.find((t) => t.idTipoMovimiento === movementForm.idTipoMovimiento);
 
-    setMovimientos([newMovement, ...movimientos]);
+      await movimientosApi.registrar({
+        idProducto: movementForm.idProducto,
+        idTipoMovimiento: movementForm.idTipoMovimiento,
+        cantidad: movementForm.cantidad,
+        idUsuario: user?.idUsuario ?? 0,
+        idSucursalOrigen: tipoSel?.esTransferencia || !tipoSel ? movementForm.idSucursalOrigen || undefined : movementForm.idSucursalOrigen || undefined,
+        idSucursalDestino: tipoSel?.esTransferencia || !tipoSel ? movementForm.idSucursalDestino || undefined : movementForm.idSucursalDestino || undefined,
+        observaciones: movementForm.observaciones || undefined,
+      });
 
-    // Actualizar stock del producto
-    setProductos(
-      productos.map((p) => {
-        if (p.nombre === movementForm.producto) {
-          let newStock = p.stock;
-          if (movementForm.tipo === 'entrada') {
-            newStock += movementForm.cantidad;
-          } else if (
-            movementForm.tipo === 'salida' ||
-            movementForm.tipo === 'merma'
-          ) {
-            newStock -= movementForm.cantidad;
-          }
-          return { ...p, stock: Math.max(0, newStock) };
-        }
-        return p;
-      })
-    );
-
-    setShowMovementModal(false);
-    resetMovementForm();
+      setShowMovementModal(false);
+      resetMovementForm();
+      await loadData();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al registrar movimiento');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const resetMovementForm = () => {
     setMovementForm({
-      tipo: 'entrada',
-      producto: '',
+      idTipoMovimiento: tiposMovimiento[0]?.idTipoMovimiento ?? 0,
+      idProducto: 0,
       cantidad: 0,
-      sucursal: sucursales[0].nombre,
-      origen: '',
-      destino: '',
+      idSucursalOrigen: 0,
+      idSucursalDestino: 0,
+      observaciones: '',
     });
   };
 
-  const handleEditProduct = (product: any) => {
+  const handleEditProduct = (product: ProductoDto) => {
     setEditingProduct(product);
-    setProductForm(product);
+    setProductForm({
+      nombre: product.nombre,
+      descripcion: product.descripcion ?? '',
+      numeroParte: product.numeroParte,
+      precio: product.precio,
+    });
     setShowProductModal(true);
   };
 
-  const handleDeleteProduct = (productId: string) => {
-    if (confirm('¿Estás seguro de que deseas eliminar este producto?')) {
-      setProductos(productos.filter((p) => p.id !== productId));
+  const handleDeleteProduct = async (productId: number) => {
+    if (confirm('¿Estás seguro de que deseas desactivar este producto?')) {
+      try {
+        await productosApi.desactivar(productId);
+        await loadData();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Error al eliminar');
+      }
     }
   };
 
-  const alertasInventario = productos.filter((p) => p.stock < p.minimo);
-
-  const movementIcons = {
-    entrada: ArrowUpCircle,
-    salida: ArrowDownCircle,
-    transferencia: ArrowRightLeft,
-    merma: XCircle,
+  const getMovementIcon = (tipo: string) => {
+    const t = tipo.toLowerCase();
+    if (t.includes('compra') || t.includes('entrada')) return ArrowUpCircle;
+    if (t.includes('venta') || t.includes('salida')) return ArrowDownCircle;
+    if (t.includes('transferencia')) return ArrowRightLeft;
+    if (t.includes('merma')) return XCircle;
+    return ArrowUpCircle;
   };
 
-  const movementColors = {
-    entrada: 'bg-green-50 text-green-700 border-green-200',
-    salida: 'bg-blue-50 text-blue-700 border-blue-200',
-    transferencia: 'bg-purple-50 text-purple-700 border-purple-200',
-    merma: 'bg-red-50 text-red-700 border-red-200',
+  const getMovementColor = (tipo: string) => {
+    const t = tipo.toLowerCase();
+    if (t.includes('compra') || t.includes('entrada')) return 'bg-green-50 text-green-700 border-green-200';
+    if (t.includes('venta') || t.includes('salida')) return 'bg-blue-50 text-blue-700 border-blue-200';
+    if (t.includes('transferencia')) return 'bg-purple-50 text-purple-700 border-purple-200';
+    if (t.includes('merma')) return 'bg-red-50 text-red-700 border-red-200';
+    return 'bg-gray-50 text-gray-700 border-gray-200';
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -211,12 +261,12 @@ export function Inventarios() {
             </h3>
           </div>
           <div className="flex flex-wrap gap-2">
-            {alertasInventario.map((p) => (
+            {alertasInventario.map((a) => (
               <span
-                key={p.id}
+                key={a.idInventario}
                 className="px-3 py-1 bg-white text-orange-700 rounded-full text-sm"
               >
-                {p.nombre} ({p.stock}/{p.minimo})
+                {a.nombreProducto} ({a.stockActual}/{a.stockMinimo})
               </span>
             ))}
           </div>
@@ -295,7 +345,7 @@ export function Inventarios() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {filteredProductos.map((producto) => (
-                    <tr key={producto.id} className="hover:bg-gray-50">
+                    <tr key={producto.idProducto} className="hover:bg-gray-50">
                       <td className="px-4 py-4">
                         <div>
                           <p className="font-medium text-gray-900">
@@ -307,10 +357,12 @@ export function Inventarios() {
                         </div>
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-900">
-                        {producto.noParte}
+                        {producto.numeroParte}
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-900">
-                        {producto.sucursal}
+                        {producto.invItems.length > 0
+                          ? producto.invItems.map((i) => i.nombreSucursal).join(', ')
+                          : 'Sin asignar'}
                       </td>
                       <td className="px-4 py-4">
                         <span
@@ -334,7 +386,7 @@ export function Inventarios() {
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleDeleteProduct(producto.id)}
+                          onClick={() => handleDeleteProduct(producto.idProducto)}
                           className="text-red-600 hover:text-red-900"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -351,36 +403,34 @@ export function Inventarios() {
           {activeTab === 'movimientos' && (
             <div className="space-y-3">
               {movimientos.map((movimiento) => {
-                const Icon = movementIcons[movimiento.tipo];
+                const Icon = getMovementIcon(movimiento.nombreTipoMovimiento);
                 return (
                   <div
-                    key={movimiento.id}
-                    className={`p-4 rounded-lg border ${movementColors[movimiento.tipo]}`}
+                    key={movimiento.idMovimiento}
+                    className={`p-4 rounded-lg border ${getMovementColor(movimiento.nombreTipoMovimiento)}`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-start gap-3">
                         <Icon className="w-5 h-5 mt-0.5" />
                         <div>
                           <p className="font-medium">
-                            {movimiento.tipo.charAt(0).toUpperCase() +
-                              movimiento.tipo.slice(1)}
+                            {movimiento.nombreTipoMovimiento}
                           </p>
                           <p className="text-sm mt-1">
-                            Producto: {movimiento.producto}
+                            Producto: {movimiento.nombreProducto}
                           </p>
                           <p className="text-sm">
                             Cantidad: {movimiento.cantidad} unidades
                           </p>
-                          {movimiento.tipo === 'transferencia' && (
+                          {movimiento.observaciones && (
                             <p className="text-sm">
-                              {movimiento.origen} → {movimiento.destino}
+                              Obs: {movimiento.observaciones}
                             </p>
                           )}
                         </div>
                       </div>
                       <div className="text-right text-sm">
-                        <p>{movimiento.fecha}</p>
-                        <p className="text-xs mt-1">{movimiento.usuario}</p>
+                        <p>{new Date(movimiento.fecha).toLocaleDateString()}</p>
                       </div>
                     </div>
                   </div>
@@ -429,7 +479,6 @@ export function Inventarios() {
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
                     rows={2}
-                    required
                   />
                 </div>
 
@@ -439,9 +488,9 @@ export function Inventarios() {
                   </label>
                   <input
                     type="text"
-                    value={productForm.noParte}
+                    value={productForm.numeroParte}
                     onChange={(e) =>
-                      setProductForm({ ...productForm, noParte: e.target.value })
+                      setProductForm({ ...productForm, numeroParte: e.target.value })
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
                     required
@@ -450,28 +499,11 @@ export function Inventarios() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Categoría
-                  </label>
-                  <select
-                    value={productForm.categoria}
-                    onChange={(e) =>
-                      setProductForm({ ...productForm, categoria: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
-                  >
-                    <option>Electrónica</option>
-                    <option>Accesorios</option>
-                    <option>Cables</option>
-                    <option>Otros</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Precio
                   </label>
                   <input
                     type="number"
+                    step="0.01"
                     value={productForm.precio}
                     onChange={(e) =>
                       setProductForm({
@@ -482,61 +514,6 @@ export function Inventarios() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
                     required
                   />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Stock Actual
-                  </label>
-                  <input
-                    type="number"
-                    value={productForm.stock}
-                    onChange={(e) =>
-                      setProductForm({
-                        ...productForm,
-                        stock: Number(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Stock Mínimo
-                  </label>
-                  <input
-                    type="number"
-                    value={productForm.minimo}
-                    onChange={(e) =>
-                      setProductForm({
-                        ...productForm,
-                        minimo: Number(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Sucursal
-                  </label>
-                  <select
-                    value={productForm.sucursal}
-                    onChange={(e) =>
-                      setProductForm({ ...productForm, sucursal: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
-                  >
-                    {sucursales.map((s) => (
-                      <option key={s.id} value={s.nombre}>
-                        {s.nombre}
-                      </option>
-                    ))}
-                  </select>
                 </div>
               </div>
 
@@ -553,9 +530,10 @@ export function Inventarios() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-teal-300 hover:bg-teal-400 text-white rounded-lg transition"
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 bg-teal-300 hover:bg-teal-400 text-white rounded-lg transition disabled:opacity-50"
                 >
-                  {editingProduct ? 'Actualizar' : 'Crear'}
+                  {saving ? 'Guardando...' : editingProduct ? 'Actualizar' : 'Crear'}
                 </button>
               </div>
             </form>
@@ -576,19 +554,22 @@ export function Inventarios() {
                   Tipo de Movimiento
                 </label>
                 <select
-                  value={movementForm.tipo}
+                  value={movementForm.idTipoMovimiento}
                   onChange={(e) =>
                     setMovementForm({
                       ...movementForm,
-                      tipo: e.target.value as any,
+                      idTipoMovimiento: Number(e.target.value),
                     })
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
+                  required
                 >
-                  <option value="entrada">Entrada</option>
-                  <option value="salida">Salida</option>
-                  <option value="transferencia">Transferencia</option>
-                  <option value="merma">Merma</option>
+                  <option value={0}>Seleccionar tipo</option>
+                  {tiposMovimiento.map((t) => (
+                    <option key={t.idTipoMovimiento} value={t.idTipoMovimiento}>
+                      {t.nombre}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -597,17 +578,17 @@ export function Inventarios() {
                   Producto
                 </label>
                 <select
-                  value={movementForm.producto}
+                  value={movementForm.idProducto}
                   onChange={(e) =>
-                    setMovementForm({ ...movementForm, producto: e.target.value })
+                    setMovementForm({ ...movementForm, idProducto: Number(e.target.value) })
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
                   required
                 >
-                  <option value="">Seleccionar producto</option>
+                  <option value={0}>Seleccionar producto</option>
                   {productos.map((p) => (
-                    <option key={p.id} value={p.nombre}>
-                      {p.nombre} - Stock: {p.stock}
+                    <option key={p.idProducto} value={p.idProducto}>
+                      {p.nombre} - {p.numeroParte}
                     </option>
                   ))}
                 </select>
@@ -634,70 +615,63 @@ export function Inventarios() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Sucursal
+                  Sucursal Origen
                 </label>
                 <select
-                  value={movementForm.sucursal}
+                  value={movementForm.idSucursalOrigen}
                   onChange={(e) =>
-                    setMovementForm({ ...movementForm, sucursal: e.target.value })
+                    setMovementForm({ ...movementForm, idSucursalOrigen: Number(e.target.value) })
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
                 >
+                  <option value={0}>Seleccionar sucursal</option>
                   {sucursales.map((s) => (
-                    <option key={s.id} value={s.nombre}>
+                    <option key={s.idSucursal} value={s.idSucursal}>
                       {s.nombre}
                     </option>
                   ))}
                 </select>
               </div>
 
-              {movementForm.tipo === 'transferencia' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Origen
-                    </label>
-                    <select
-                      value={movementForm.origen}
-                      onChange={(e) =>
-                        setMovementForm({ ...movementForm, origen: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
-                      required
-                    >
-                      <option value="">Seleccionar origen</option>
-                      {sucursales.map((s) => (
-                        <option key={s.id} value={s.nombre}>
-                          {s.nombre}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Destino
-                    </label>
-                    <select
-                      value={movementForm.destino}
-                      onChange={(e) =>
-                        setMovementForm({
-                          ...movementForm,
-                          destino: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
-                      required
-                    >
-                      <option value="">Seleccionar destino</option>
-                      {sucursales.map((s) => (
-                        <option key={s.id} value={s.nombre}>
-                          {s.nombre}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </>
+              {tiposMovimiento.find((t) => t.idTipoMovimiento === movementForm.idTipoMovimiento)?.esTransferencia && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Sucursal Destino
+                  </label>
+                  <select
+                    value={movementForm.idSucursalDestino}
+                    onChange={(e) =>
+                      setMovementForm({
+                        ...movementForm,
+                        idSucursalDestino: Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
+                    required
+                  >
+                    <option value={0}>Seleccionar destino</option>
+                    {sucursales.map((s) => (
+                      <option key={s.idSucursal} value={s.idSucursal}>
+                        {s.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Observaciones
+                </label>
+                <textarea
+                  value={movementForm.observaciones}
+                  onChange={(e) =>
+                    setMovementForm({ ...movementForm, observaciones: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
+                  rows={2}
+                />
+              </div>
 
               <div className="flex gap-3 pt-4">
                 <button
@@ -709,9 +683,10 @@ export function Inventarios() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition"
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition disabled:opacity-50"
                 >
-                  Registrar
+                  {saving ? 'Registrando...' : 'Registrar'}
                 </button>
               </div>
             </form>

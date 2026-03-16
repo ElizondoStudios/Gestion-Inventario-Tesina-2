@@ -28,6 +28,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { toast } from 'sonner';
 
 export function Inventarios() {
   const { user } = useAuth();
@@ -60,6 +61,32 @@ export function Inventarios() {
     idSucursalDestino: 0,
     observaciones: '',
   });
+
+  const normalize = (value?: string) => (value ?? '').trim().toLowerCase();
+
+  const hasPermiso = (
+    modulo: string,
+    categoria: string,
+    accion: 'leer' | 'escribir' | 'eliminar'
+  ) => {
+    const moduloNorm = normalize(modulo);
+    const categoriaNorm = normalize(categoria);
+
+    return (user?.permisos ?? []).some((p) => {
+      const sameModulo = normalize(p.nombreModulo) === moduloNorm;
+      const sameCategoria = normalize(p.nombreCategoria) === categoriaNorm;
+
+      if (!sameModulo || !sameCategoria) return false;
+
+      if (accion === 'leer') return p.puedeLeer;
+      if (accion === 'escribir') return p.puedeEscribir;
+      return p.puedeEliminar;
+    });
+  };
+
+  const canWriteProductos = hasPermiso('Inventario', 'Productos', 'escribir');
+  const canDeleteProductos = hasPermiso('Inventario', 'Productos', 'eliminar');
+  const canWriteMovimientos = hasPermiso('Inventario', 'Movimientos', 'escribir');
 
   useEffect(() => {
     loadData();
@@ -114,6 +141,12 @@ export function Inventarios() {
 
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!canWriteProductos) {
+      toast.error('No tienes permisos para crear o editar productos.');
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -127,8 +160,9 @@ export function Inventarios() {
       setEditingProduct(null);
       resetProductForm();
       await loadData();
+      toast.success(editingProduct ? 'Producto actualizado correctamente.' : 'Producto creado correctamente.');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error al guardar producto');
+      toast.error(err instanceof Error ? err.message : 'Error al guardar producto');
     } finally {
       setSaving(false);
     }
@@ -145,82 +179,23 @@ export function Inventarios() {
 
   const handleMovementSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const tipoSel = tiposMovimiento.find((t) => t.idTipoMovimiento === movementForm.idTipoMovimiento);
-    if (!tipoSel) {
-      alert('Debes seleccionar un tipo de movimiento válido.');
+
+    if (!canWriteMovimientos) {
+      toast.error('No tienes permisos para registrar movimientos.');
+      return;
+    }
+
+    if (!movementValidation.canSubmit) {
+      toast.error(movementValidation.message ?? 'Completa los datos para registrar el movimiento.');
       return;
     }
 
     if (!user?.idUsuario) {
-      alert('No hay un usuario autenticado para registrar el movimiento.');
+      toast.error('No hay un usuario autenticado para registrar el movimiento.');
       return;
     }
 
-    if (movementForm.idProducto === 0) {
-      alert('Debes seleccionar un producto.');
-      return;
-    }
-
-    if (movementForm.cantidad <= 0) {
-      alert('La cantidad debe ser mayor a 0.');
-      return;
-    }
-
-    const kind = inferMovementKind(tipoSel);
-
-    if (kind === 'entrada') {
-      if (movementForm.idSucursalDestino === 0) {
-        alert('Debes seleccionar una sucursal destino para una entrada.');
-        return;
-      }
-    }
-
-    if (kind === 'salida') {
-      if (movementForm.idSucursalOrigen === 0) {
-        alert('Debes seleccionar una sucursal origen para una salida.');
-        return;
-      }
-
-      const inventarioOrigen = inventario.find(
-        (i) => i.idProducto === movementForm.idProducto && i.idSucursal === movementForm.idSucursalOrigen
-      );
-
-      if (!inventarioOrigen) {
-        alert('No existe inventario de este producto en la sucursal origen seleccionada.');
-        return;
-      }
-
-      if (inventarioOrigen.stockActual < movementForm.cantidad) {
-        alert(`Stock insuficiente en sucursal origen. Disponible: ${inventarioOrigen.stockActual}.`);
-        return;
-      }
-    }
-
-    if (kind === 'transferencia') {
-      if (movementForm.idSucursalOrigen === 0 || movementForm.idSucursalDestino === 0) {
-        alert('Debes seleccionar sucursal origen y destino para una transferencia.');
-        return;
-      }
-
-      if (movementForm.idSucursalOrigen === movementForm.idSucursalDestino) {
-        alert('La sucursal origen y destino no pueden ser la misma.');
-        return;
-      }
-
-      const inventarioOrigen = inventario.find(
-        (i) => i.idProducto === movementForm.idProducto && i.idSucursal === movementForm.idSucursalOrigen
-      );
-
-      if (!inventarioOrigen) {
-        alert('No existe inventario de este producto en la sucursal origen seleccionada.');
-        return;
-      }
-
-      if (inventarioOrigen.stockActual < movementForm.cantidad) {
-        alert(`Stock insuficiente en sucursal origen. Disponible: ${inventarioOrigen.stockActual}.`);
-        return;
-      }
-    }
+    const kind = selectedMovementKind;
 
     setSaving(true);
 
@@ -244,8 +219,9 @@ export function Inventarios() {
       setShowMovementModal(false);
       resetMovementForm();
       await loadData();
+      toast.success('Movimiento registrado correctamente.');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error al registrar movimiento');
+      toast.error(err instanceof Error ? err.message : 'Error al registrar movimiento');
     } finally {
       setSaving(false);
     }
@@ -263,6 +239,11 @@ export function Inventarios() {
   };
 
   const handleEditProduct = (product: ProductoDto) => {
+    if (!canWriteProductos) {
+      toast.error('No tienes permisos para editar productos.');
+      return;
+    }
+
     setEditingProduct(product);
     setProductForm({
       nombre: product.nombre,
@@ -274,12 +255,18 @@ export function Inventarios() {
   };
 
   const handleDeleteProduct = async (productId: number) => {
+    if (!canDeleteProductos) {
+      toast.error('No tienes permisos para eliminar productos.');
+      return;
+    }
+
     if (confirm('¿Estás seguro de que deseas desactivar este producto?')) {
       try {
         await productosApi.desactivar(productId);
         await loadData();
+        toast.success('Producto desactivado correctamente.');
       } catch (err) {
-        alert(err instanceof Error ? err.message : 'Error al eliminar');
+        toast.error(err instanceof Error ? err.message : 'Error al eliminar');
       }
     }
   };
@@ -332,6 +319,51 @@ export function Inventarios() {
         : []
       : productos;
 
+  const movementValidation: { canSubmit: boolean; message?: string } = (() => {
+    if (!user?.idUsuario) return { canSubmit: false, message: 'No hay un usuario autenticado.' };
+    if (sucursalesPermitidas.length === 0) return { canSubmit: false, message: 'No tienes sucursales asignadas.' };
+    if (!selectedTipo) return { canSubmit: false, message: 'Debes seleccionar un tipo de movimiento.' };
+
+    if (selectedMovementKind === 'entrada' && movementForm.idSucursalDestino === 0) {
+      return { canSubmit: false, message: 'Debes seleccionar una sucursal destino.' };
+    }
+
+    if ((selectedMovementKind === 'salida' || selectedMovementKind === 'transferencia') && movementForm.idSucursalOrigen === 0) {
+      return { canSubmit: false, message: 'Debes seleccionar una sucursal origen.' };
+    }
+
+    if (selectedMovementKind === 'transferencia' && movementForm.idSucursalDestino === 0) {
+      return { canSubmit: false, message: 'Debes seleccionar una sucursal destino.' };
+    }
+
+    if (
+      selectedMovementKind === 'transferencia' &&
+      movementForm.idSucursalOrigen > 0 &&
+      movementForm.idSucursalDestino > 0 &&
+      movementForm.idSucursalOrigen === movementForm.idSucursalDestino
+    ) {
+      return { canSubmit: false, message: 'La sucursal origen y destino no pueden ser la misma.' };
+    }
+
+    if (movementForm.idProducto === 0) return { canSubmit: false, message: 'Debes seleccionar un producto.' };
+    if (movementForm.cantidad <= 0) return { canSubmit: false, message: 'La cantidad debe ser mayor a 0.' };
+
+    if (selectedMovementKind === 'salida' || selectedMovementKind === 'transferencia') {
+      if (!inventarioSucursalProducto) {
+        return { canSubmit: false, message: 'No existe inventario del producto en la sucursal origen seleccionada.' };
+      }
+
+      if (inventarioSucursalProducto.stockActual < movementForm.cantidad) {
+        return {
+          canSubmit: false,
+          message: `Stock insuficiente en origen. Disponible: ${inventarioSucursalProducto.stockActual}.`,
+        };
+      }
+    }
+
+    return { canSubmit: true };
+  })();
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -351,21 +383,33 @@ export function Inventarios() {
         <div className="flex gap-2">
           <button
             onClick={() => {
+              if (!canWriteProductos) {
+                toast.error('No tienes permisos para crear productos.');
+                return;
+              }
+
               setEditingProduct(null);
               resetProductForm();
               setShowProductModal(true);
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-300 hover:bg-teal-400 text-white rounded-lg transition"
+            disabled={!canWriteProductos}
+            className="flex items-center gap-2 px-4 py-2 bg-teal-300 hover:bg-teal-400 text-white rounded-lg transition disabled:opacity-50"
           >
             <Plus className="w-5 h-5" />
             Nuevo Producto
           </button>
           <button
             onClick={() => {
+              if (!canWriteMovimientos) {
+                toast.error('No tienes permisos para registrar movimientos.');
+                return;
+              }
+
               resetMovementForm();
               setShowMovementModal(true);
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition"
+            disabled={!canWriteMovimientos}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition disabled:opacity-50"
           >
             <ArrowRightLeft className="w-5 h-5" />
             Registrar Movimiento
@@ -503,13 +547,15 @@ export function Inventarios() {
                       <td className="px-4 py-4 text-right">
                         <button
                           onClick={() => handleEditProduct(producto)}
-                          className="text-teal-600 hover:text-teal-900 mr-3"
+                          disabled={!canWriteProductos}
+                          className="text-teal-600 hover:text-teal-900 mr-3 disabled:opacity-40"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteProduct(producto.idProducto)}
-                          className="text-red-600 hover:text-red-900"
+                          disabled={!canDeleteProductos}
+                          className="text-red-600 hover:text-red-900 disabled:opacity-40"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -653,7 +699,7 @@ export function Inventarios() {
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={saving || !canWriteProductos}
                   className="flex-1 px-4 py-2 bg-teal-300 hover:bg-teal-400 text-white rounded-lg transition disabled:opacity-50"
                 >
                   {saving ? 'Guardando...' : editingProduct ? 'Actualizar' : 'Crear'}
@@ -672,30 +718,6 @@ export function Inventarios() {
               Registrar Movimiento
             </h2>
             <form onSubmit={handleMovementSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tipo de Movimiento
-                </label>
-                <select
-                  value={movementForm.idTipoMovimiento}
-                  onChange={(e) =>
-                    setMovementForm({
-                      ...movementForm,
-                      idTipoMovimiento: Number(e.target.value),
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
-                  required
-                >
-                  <option value={0}>Seleccionar tipo</option>
-                  {tiposMovimiento.map((t) => (
-                    <option key={t.idTipoMovimiento} value={t.idTipoMovimiento}>
-                      {t.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Tipo de Movimiento
@@ -872,7 +894,7 @@ export function Inventarios() {
                 </button>
                 <button
                   type="submit"
-                  disabled={saving || sucursalesPermitidas.length === 0}
+                  disabled={saving || !movementValidation.canSubmit || !canWriteMovimientos}
                   className="flex-1 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition disabled:opacity-50"
                 >
                   {saving ? 'Registrando...' : 'Registrar'}

@@ -145,18 +145,99 @@ export function Inventarios() {
 
   const handleMovementSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const tipoSel = tiposMovimiento.find((t) => t.idTipoMovimiento === movementForm.idTipoMovimiento);
+    if (!tipoSel) {
+      alert('Debes seleccionar un tipo de movimiento válido.');
+      return;
+    }
+
+    if (!user?.idUsuario) {
+      alert('No hay un usuario autenticado para registrar el movimiento.');
+      return;
+    }
+
+    if (movementForm.idProducto === 0) {
+      alert('Debes seleccionar un producto.');
+      return;
+    }
+
+    if (movementForm.cantidad <= 0) {
+      alert('La cantidad debe ser mayor a 0.');
+      return;
+    }
+
+    const kind = inferMovementKind(tipoSel);
+
+    if (kind === 'entrada') {
+      if (movementForm.idSucursalDestino === 0) {
+        alert('Debes seleccionar una sucursal destino para una entrada.');
+        return;
+      }
+    }
+
+    if (kind === 'salida') {
+      if (movementForm.idSucursalOrigen === 0) {
+        alert('Debes seleccionar una sucursal origen para una salida.');
+        return;
+      }
+
+      const inventarioOrigen = inventario.find(
+        (i) => i.idProducto === movementForm.idProducto && i.idSucursal === movementForm.idSucursalOrigen
+      );
+
+      if (!inventarioOrigen) {
+        alert('No existe inventario de este producto en la sucursal origen seleccionada.');
+        return;
+      }
+
+      if (inventarioOrigen.stockActual < movementForm.cantidad) {
+        alert(`Stock insuficiente en sucursal origen. Disponible: ${inventarioOrigen.stockActual}.`);
+        return;
+      }
+    }
+
+    if (kind === 'transferencia') {
+      if (movementForm.idSucursalOrigen === 0 || movementForm.idSucursalDestino === 0) {
+        alert('Debes seleccionar sucursal origen y destino para una transferencia.');
+        return;
+      }
+
+      if (movementForm.idSucursalOrigen === movementForm.idSucursalDestino) {
+        alert('La sucursal origen y destino no pueden ser la misma.');
+        return;
+      }
+
+      const inventarioOrigen = inventario.find(
+        (i) => i.idProducto === movementForm.idProducto && i.idSucursal === movementForm.idSucursalOrigen
+      );
+
+      if (!inventarioOrigen) {
+        alert('No existe inventario de este producto en la sucursal origen seleccionada.');
+        return;
+      }
+
+      if (inventarioOrigen.stockActual < movementForm.cantidad) {
+        alert(`Stock insuficiente en sucursal origen. Disponible: ${inventarioOrigen.stockActual}.`);
+        return;
+      }
+    }
+
     setSaving(true);
 
     try {
-      const tipoSel = tiposMovimiento.find((t) => t.idTipoMovimiento === movementForm.idTipoMovimiento);
-
       await movimientosApi.registrar({
         idProducto: movementForm.idProducto,
         idTipoMovimiento: movementForm.idTipoMovimiento,
         cantidad: movementForm.cantidad,
-        idUsuario: user?.idUsuario ?? 0,
-        idSucursalOrigen: tipoSel?.esTransferencia || !tipoSel ? movementForm.idSucursalOrigen || undefined : movementForm.idSucursalOrigen || undefined,
-        idSucursalDestino: tipoSel?.esTransferencia || !tipoSel ? movementForm.idSucursalDestino || undefined : movementForm.idSucursalDestino || undefined,
+        idUsuario: user.idUsuario,
+        idSucursalOrigen:
+          kind === 'salida' || kind === 'transferencia'
+            ? movementForm.idSucursalOrigen || undefined
+            : undefined,
+        idSucursalDestino:
+          kind === 'entrada' || kind === 'transferencia'
+            ? movementForm.idSucursalDestino || undefined
+            : undefined,
         observaciones: movementForm.observaciones || undefined,
       });
 
@@ -220,6 +301,36 @@ export function Inventarios() {
     if (t.includes('merma')) return 'bg-red-50 text-red-700 border-red-200';
     return 'bg-gray-50 text-gray-700 border-gray-200';
   };
+
+  const inferMovementKind = (tipo?: TipoMovimientoDto): 'entrada' | 'salida' | 'transferencia' => {
+    if (!tipo) return 'salida';
+    if (tipo.esTransferencia) return 'transferencia';
+
+    const nombre = tipo.nombre.toLowerCase();
+    if (nombre.includes('compra') || nombre.includes('entrada')) return 'entrada';
+
+    return 'salida';
+  };
+
+  const selectedTipo = tiposMovimiento.find((t) => t.idTipoMovimiento === movementForm.idTipoMovimiento);
+  const selectedMovementKind = inferMovementKind(selectedTipo);
+  const sucursalReferenciaId =
+    selectedMovementKind === 'entrada'
+      ? movementForm.idSucursalDestino
+      : movementForm.idSucursalOrigen;
+
+  const inventarioSucursalProducto = inventario.find(
+    (i) => i.idProducto === movementForm.idProducto && i.idSucursal === sucursalReferenciaId
+  );
+
+  const productosDisponiblesSegunSucursal =
+    selectedMovementKind === 'salida' || selectedMovementKind === 'transferencia'
+      ? sucursalReferenciaId > 0
+        ? productos.filter((p) =>
+            inventario.some((i) => i.idSucursal === sucursalReferenciaId && i.idProducto === p.idProducto)
+          )
+        : []
+      : productos;
 
   if (loading) {
     return (
@@ -414,11 +525,12 @@ export function Inventarios() {
           {activeTab === 'movimientos' && (
             <div className="space-y-3">
               {movimientos.map((movimiento) => {
-                const Icon = getMovementIcon(movimiento.nombreTipoMovimiento);
+                const tipoNombre = movimiento.nombreTipoMovimiento ?? 'Movimiento';
+                const Icon = getMovementIcon(tipoNombre);
                 return (
                   <div
                     key={movimiento.idMovimiento}
-                    className={`p-4 rounded-lg border ${getMovementColor(movimiento.nombreTipoMovimiento)}`}
+                    className={`p-4 rounded-lg border ${getMovementColor(tipoNombre)}`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-start gap-3">
@@ -586,6 +698,91 @@ export function Inventarios() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tipo de Movimiento
+                </label>
+                <select
+                  value={movementForm.idTipoMovimiento}
+                  onChange={(e) =>
+                    setMovementForm({
+                      ...movementForm,
+                      idTipoMovimiento: Number(e.target.value),
+                      idSucursalOrigen: 0,
+                      idSucursalDestino: 0,
+                      idProducto: 0,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
+                  required
+                >
+                  <option value={0}>Seleccionar tipo</option>
+                  {tiposMovimiento.map((t) => (
+                    <option key={t.idTipoMovimiento} value={t.idTipoMovimiento}>
+                      {t.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {(selectedMovementKind === 'salida' || selectedMovementKind === 'transferencia') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Sucursal Origen
+                  </label>
+                  <select
+                    value={movementForm.idSucursalOrigen}
+                    onChange={(e) =>
+                      setMovementForm({
+                        ...movementForm,
+                        idSucursalOrigen: Number(e.target.value),
+                        idProducto: 0,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
+                  >
+                    <option value={0}>Seleccionar origen</option>
+                    {sucursalesPermitidas.map((s) => (
+                      <option key={s.idSucursal} value={s.idSucursal}>
+                        {s.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {(selectedMovementKind === 'entrada' || selectedMovementKind === 'transferencia') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Sucursal Destino
+                  </label>
+                  <select
+                    value={movementForm.idSucursalDestino}
+                    onChange={(e) =>
+                      setMovementForm({
+                        ...movementForm,
+                        idSucursalDestino: Number(e.target.value),
+                        idProducto: 0,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
+                  >
+                    <option value={0}>Seleccionar destino</option>
+                    {sucursalesPermitidas
+                      .filter((s) =>
+                        selectedMovementKind === 'transferencia'
+                          ? s.idSucursal !== movementForm.idSucursalOrigen
+                          : true
+                      )
+                      .map((s) => (
+                        <option key={s.idSucursal} value={s.idSucursal}>
+                          {s.nombre}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Producto
                 </label>
                 <select
@@ -595,9 +792,14 @@ export function Inventarios() {
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
                   required
+                  disabled={sucursalReferenciaId === 0}
                 >
-                  <option value={0}>Seleccionar producto</option>
-                  {productos.map((p) => (
+                  <option value={0}>
+                    {sucursalReferenciaId === 0
+                      ? 'Primero selecciona una sucursal'
+                      : 'Seleccionar producto'}
+                  </option>
+                  {productosDisponiblesSegunSucursal.map((p) => (
                     <option key={p.idProducto} value={p.idProducto}>
                       {p.nombre} - {p.numeroParte}
                     </option>
@@ -624,51 +826,21 @@ export function Inventarios() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Sucursal Origen
-                </label>
-                <select
-                  value={movementForm.idSucursalOrigen}
-                  onChange={(e) =>
-                    setMovementForm({ ...movementForm, idSucursalOrigen: Number(e.target.value) })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
-                >
-                  <option value={0}>Seleccionar sucursal</option>
-                  {sucursalesPermitidas.map((s) => (
-                    <option key={s.idSucursal} value={s.idSucursal}>
-                      {s.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {tiposMovimiento.find((t) => t.idTipoMovimiento === movementForm.idTipoMovimiento)?.esTransferencia && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Sucursal Destino
-                  </label>
-                  <select
-                    value={movementForm.idSucursalDestino}
-                    onChange={(e) =>
-                      setMovementForm({
-                        ...movementForm,
-                        idSucursalDestino: Number(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
-                    required
+              {sucursalReferenciaId > 0 &&
+                movementForm.idProducto > 0 &&
+                (
+                  <p
+                    className={`text-sm rounded-lg p-2 border ${
+                      inventarioSucursalProducto
+                        ? 'text-gray-700 bg-gray-50 border-gray-200'
+                        : 'text-red-700 bg-red-50 border-red-200'
+                    }`}
                   >
-                    <option value={0}>Seleccionar destino</option>
-                    {sucursalesPermitidas.map((s) => (
-                      <option key={s.idSucursal} value={s.idSucursal}>
-                        {s.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+                    {inventarioSucursalProducto
+                      ? `Existencia actual en la sucursal seleccionada: ${inventarioSucursalProducto.stockActual}`
+                      : 'No existe inventario de este producto en la sucursal seleccionada.'}
+                  </p>
+                )}
 
               {sucursalesPermitidas.length === 0 && (
                 <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">

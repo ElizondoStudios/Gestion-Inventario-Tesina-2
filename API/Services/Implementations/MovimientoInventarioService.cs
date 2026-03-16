@@ -17,6 +17,7 @@ public class MovimientoInventarioService : IMovimientoInventarioService
     private readonly IProductoRepository _productoRepo;
     private readonly ISucursalRepository _sucursalRepo;
     private readonly IUsuarioRepository _usuarioRepo;
+    private readonly IUsuarioSucursalRepository _usuarioSucursalRepo;
     private readonly ITipoMovimientoRepository _tipoMovimientoRepo;
     private readonly IMovimientoLogRepository _movimientoLogRepo;
 
@@ -26,6 +27,7 @@ public class MovimientoInventarioService : IMovimientoInventarioService
         IProductoRepository productoRepo,
         ISucursalRepository sucursalRepo,
         IUsuarioRepository usuarioRepo,
+        IUsuarioSucursalRepository usuarioSucursalRepo,
         ITipoMovimientoRepository tipoMovimientoRepo,
         IMovimientoLogRepository movimientoLogRepo)
     {
@@ -34,6 +36,7 @@ public class MovimientoInventarioService : IMovimientoInventarioService
         _productoRepo = productoRepo;
         _sucursalRepo = sucursalRepo;
         _usuarioRepo = usuarioRepo;
+        _usuarioSucursalRepo = usuarioSucursalRepo;
         _tipoMovimientoRepo = tipoMovimientoRepo;
         _movimientoLogRepo = movimientoLogRepo;
     }
@@ -87,6 +90,24 @@ public class MovimientoInventarioService : IMovimientoInventarioService
         // Validar que el tipo de movimiento exista
         var tipoMovimiento = await _tipoMovimientoRepo.GetByIdAsync(dto.IdTipoMovimiento)
             ?? throw new InvalidOperationException("El tipo de movimiento especificado no existe.");
+
+        // Validar que el usuario tenga asignadas las sucursales involucradas
+        if (tipoMovimiento.EsTransferencia)
+        {
+            if (dto.IdSucursalOrigen is not null)
+                await ValidarUsuarioAsignadoASucursalAsync(dto.IdUsuario, dto.IdSucursalOrigen.Value, "origen");
+
+            if (dto.IdSucursalDestino is not null)
+                await ValidarUsuarioAsignadoASucursalAsync(dto.IdUsuario, dto.IdSucursalDestino.Value, "destino");
+        }
+        else if (tipoMovimiento.AfectaStock)
+        {
+            if (dto.IdSucursalOrigen is not null)
+                await ValidarUsuarioAsignadoASucursalAsync(dto.IdUsuario, dto.IdSucursalOrigen.Value, "origen");
+
+            if (dto.IdSucursalDestino is not null)
+                await ValidarUsuarioAsignadoASucursalAsync(dto.IdUsuario, dto.IdSucursalDestino.Value, "destino");
+        }
 
         // Validar reglas por tipo de movimiento
         if (tipoMovimiento.EsTransferencia)
@@ -251,6 +272,19 @@ public class MovimientoInventarioService : IMovimientoInventarioService
         }
 
         await _inventarioRepo.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Verifica que el usuario esté asignado a la sucursal indicada.
+    /// </summary>
+    private async Task ValidarUsuarioAsignadoASucursalAsync(int idUsuario, int idSucursal, string tipoSucursal)
+    {
+        var asignacion = await _usuarioSucursalRepo.GetByCompositeKeyAsync(idUsuario, idSucursal);
+        if (asignacion is null)
+        {
+            throw new InvalidOperationException(
+                $"El usuario no tiene asignada la sucursal de {tipoSucursal} (IdSucursal: {idSucursal}).");
+        }
     }
 
     // ─── Mapeo privado ───

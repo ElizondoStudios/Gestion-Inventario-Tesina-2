@@ -202,8 +202,8 @@ public class AppDbContext : DbContext
             entity.HasKey(e => e.IdLog);
             entity.Property(e => e.Accion).IsRequired().HasMaxLength(100);
             entity.Property(e => e.Fecha).IsRequired();
-            entity.Property(e => e.ValorAnterior).HasColumnType("nvarchar(max)");
-            entity.Property(e => e.ValorNuevo).HasColumnType("nvarchar(max)");
+            entity.Property(e => e.ValorAnterior).HasColumnType("TEXT");
+            entity.Property(e => e.ValorNuevo).HasColumnType("TEXT");
 
             entity.HasOne(e => e.MovimientoInventario)
                   .WithMany(m => m.MovimientoLogs)

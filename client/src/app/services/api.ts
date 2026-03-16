@@ -5,6 +5,7 @@ import type {
   UsuarioDetalleDto,
   CreateUsuarioDto,
   UpdateUsuarioDto,
+  AsignarSucursalDto,
   RolDto,
   RolDetalleDto,
   CreateRolDto,
@@ -79,6 +80,17 @@ export const usuariosApi = {
 
   desactivar: (id: number) =>
     request<void>(`/Usuarios/${id}`, { method: 'DELETE' }),
+
+  asignarSucursal: (idUsuario: number, dto: AsignarSucursalDto) =>
+    request<void>(`/Usuarios/${idUsuario}/sucursales`, {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    }),
+
+  removerSucursal: (idUsuario: number, idSucursal: number) =>
+    request<void>(`/Usuarios/${idUsuario}/sucursales/${idSucursal}`, {
+      method: 'DELETE',
+    }),
 };
 
 // ─── Roles ───

@@ -160,10 +160,10 @@ namespace API.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("ValorAnterior")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ValorNuevo")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("IdLog");
 

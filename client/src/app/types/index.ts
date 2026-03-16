@@ -47,6 +47,10 @@ export interface LoginDto {
   contrasenia: string;
 }
 
+export interface AsignarSucursalDto {
+  idSucursal: number;
+}
+
 // ─── Roles ───
 
 export interface RolDto {

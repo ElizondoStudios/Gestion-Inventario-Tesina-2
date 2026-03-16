@@ -5,6 +5,7 @@ import {
   movimientosApi,
   sucursalesApi,
   tiposMovimientoApi,
+  usuariosApi,
 } from '../services/api';
 import type {
   InventarioDto,
@@ -34,6 +35,7 @@ export function Inventarios() {
   const [productos, setProductos] = useState<ProductoDto[]>([]);
   const [movimientos, setMovimientos] = useState<MovimientoInventarioDto[]>([]);
   const [sucursales, setSucursales] = useState<SucursalDto[]>([]);
+  const [sucursalesPermitidas, setSucursalesPermitidas] = useState<SucursalDto[]>([]);
   const [tiposMovimiento, setTiposMovimiento] = useState<TipoMovimientoDto[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showProductModal, setShowProductModal] = useState(false);
@@ -73,10 +75,19 @@ export function Inventarios() {
         sucursalesApi.getAll(),
         tiposMovimientoApi.getAll(),
       ]);
+
+      let sucursalesHabilitadas = sucs;
+      if (user?.idUsuario) {
+        const usuarioDetalle = await usuariosApi.getById(user.idUsuario);
+        const idsPermitidos = new Set(usuarioDetalle.sucursales.map((s) => s.idSucursal));
+        sucursalesHabilitadas = sucs.filter((s) => idsPermitidos.has(s.idSucursal));
+      }
+
       setInventario(inv);
       setProductos(prods);
       setMovimientos(movs);
       setSucursales(sucs);
+      setSucursalesPermitidas(sucursalesHabilitadas);
       setTiposMovimiento(tipos);
     } catch (err) {
       console.error('Error al cargar datos:', err);
@@ -625,7 +636,7 @@ export function Inventarios() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
                 >
                   <option value={0}>Seleccionar sucursal</option>
-                  {sucursales.map((s) => (
+                  {sucursalesPermitidas.map((s) => (
                     <option key={s.idSucursal} value={s.idSucursal}>
                       {s.nombre}
                     </option>
@@ -650,13 +661,19 @@ export function Inventarios() {
                     required
                   >
                     <option value={0}>Seleccionar destino</option>
-                    {sucursales.map((s) => (
+                    {sucursalesPermitidas.map((s) => (
                       <option key={s.idSucursal} value={s.idSucursal}>
                         {s.nombre}
                       </option>
                     ))}
                   </select>
                 </div>
+              )}
+
+              {sucursalesPermitidas.length === 0 && (
+                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                  No tienes sucursales asignadas. Solicita a un administrador que te asigne al menos una sucursal.
+                </p>
               )}
 
               <div>
@@ -683,7 +700,7 @@ export function Inventarios() {
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={saving || sucursalesPermitidas.length === 0}
                   className="flex-1 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition disabled:opacity-50"
                 >
                   {saving ? 'Registrando...' : 'Registrar'}

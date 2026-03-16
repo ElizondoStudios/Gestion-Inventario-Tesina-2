@@ -1,16 +1,21 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, Search, Edit2, Trash2, UserCheck, UserX, Loader2 } from 'lucide-react';
-import { usuariosApi, rolesApi } from '../services/api';
-import type { UsuarioDto, RolDto } from '../types';
+import { UserPlus, Search, Edit2, Trash2, UserCheck, UserX, Loader2, Building2, Plus, X } from 'lucide-react';
+import { usuariosApi, rolesApi, sucursalesApi } from '../services/api';
+import type { UsuarioDto, RolDto, UsuarioDetalleDto, SucursalDto } from '../types';
 
 export function Usuarios() {
   const [usuarios, setUsuarios] = useState<UsuarioDto[]>([]);
   const [roles, setRoles] = useState<RolDto[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [showSucursalesModal, setShowSucursalesModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UsuarioDto | null>(null);
+  const [selectedUserDetalle, setSelectedUserDetalle] = useState<UsuarioDetalleDto | null>(null);
+  const [allSucursales, setAllSucursales] = useState<SucursalDto[]>([]);
+  const [idSucursalToAssign, setIdSucursalToAssign] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadingSucursales, setLoadingSucursales] = useState(false);
 
   const [formData, setFormData] = useState({
     nombre: '',
@@ -94,6 +99,62 @@ export function Usuarios() {
       } catch (err) {
         alert(err instanceof Error ? err.message : 'Error al eliminar');
       }
+    }
+  };
+
+  const openSucursalesModal = async (userId: number) => {
+    try {
+      setLoadingSucursales(true);
+      const [userDetalle, sucursales] = await Promise.all([
+        usuariosApi.getById(userId),
+        sucursalesApi.getAll(),
+      ]);
+
+      setSelectedUserDetalle(userDetalle);
+      setAllSucursales(sucursales.filter((s) => s.activa));
+      setIdSucursalToAssign(0);
+      setShowSucursalesModal(true);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al cargar sucursales del usuario');
+    } finally {
+      setLoadingSucursales(false);
+    }
+  };
+
+  const refreshSelectedUserDetalle = async () => {
+    if (!selectedUserDetalle) return;
+    const updated = await usuariosApi.getById(selectedUserDetalle.idUsuario);
+    setSelectedUserDetalle(updated);
+  };
+
+  const handleAsignarSucursal = async () => {
+    if (!selectedUserDetalle || idSucursalToAssign === 0) return;
+
+    setSaving(true);
+    try {
+      await usuariosApi.asignarSucursal(selectedUserDetalle.idUsuario, {
+        idSucursal: idSucursalToAssign,
+      });
+      await refreshSelectedUserDetalle();
+      setIdSucursalToAssign(0);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al asignar sucursal');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoverSucursal = async (idSucursal: number) => {
+    if (!selectedUserDetalle) return;
+
+    setSaving(true);
+    try {
+      await usuariosApi.removerSucursal(selectedUserDetalle.idUsuario, idSucursal);
+      await refreshSelectedUserDetalle();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al remover sucursal');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -213,6 +274,13 @@ export function Usuarios() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
+                      onClick={() => openSucursalesModal(usuario.idUsuario)}
+                      className="text-indigo-600 hover:text-indigo-900 mr-3"
+                      title="Asignar sucursales"
+                    >
+                      <Building2 className="w-4 h-4" />
+                    </button>
+                    <button
                       onClick={() => handleEdit(usuario)}
                       className="text-teal-600 hover:text-teal-900 mr-3"
                     >
@@ -327,6 +395,90 @@ export function Usuarios() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de asignación de sucursales */}
+      {showSucursalesModal && selectedUserDetalle && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-lg w-full p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-2">
+              Sucursales de {selectedUserDetalle.nombre}
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">Solo en estas sucursales podrá registrar movimientos.</p>
+
+            <div className="flex gap-2 mb-4">
+              <select
+                value={idSucursalToAssign}
+                onChange={(e) => setIdSucursalToAssign(Number(e.target.value))}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-300 focus:border-transparent"
+                disabled={saving || loadingSucursales}
+              >
+                <option value={0}>Seleccionar sucursal para asignar</option>
+                {allSucursales
+                  .filter(
+                    (s) => !selectedUserDetalle.sucursales.some((us) => us.idSucursal === s.idSucursal)
+                  )
+                  .map((sucursal) => (
+                    <option key={sucursal.idSucursal} value={sucursal.idSucursal}>
+                      {sucursal.nombre}
+                    </option>
+                  ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleAsignarSucursal}
+                disabled={saving || idSucursalToAssign === 0}
+                className="px-3 py-2 bg-teal-300 hover:bg-teal-400 text-white rounded-lg disabled:opacity-50"
+                title="Asignar"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2 max-h-64 overflow-y-auto mb-4">
+              {selectedUserDetalle.sucursales.length === 0 && (
+                <div className="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  Este usuario no tiene sucursales asignadas.
+                </div>
+              )}
+
+              {selectedUserDetalle.sucursales.map((sucursal) => (
+                <div
+                  key={sucursal.idSucursal}
+                  className="flex items-center justify-between px-3 py-2 border border-gray-200 rounded-lg"
+                >
+                  <div>
+                    <p className="font-medium text-gray-900">{sucursal.nombre}</p>
+                    <p className="text-xs text-gray-500">{sucursal.ciudad}, {sucursal.estado}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoverSucursal(sucursal.idSucursal)}
+                    disabled={saving}
+                    className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                    title="Remover asignación"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSucursalesModal(false);
+                  setSelectedUserDetalle(null);
+                  setIdSucursalToAssign(0);
+                }}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}

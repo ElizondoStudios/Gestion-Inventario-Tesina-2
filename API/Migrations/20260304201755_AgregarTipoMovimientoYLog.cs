@@ -32,8 +32,8 @@ namespace API.Migrations
                     IdUsuario = table.Column<int>(type: "INTEGER", nullable: false),
                     Accion = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
                     Fecha = table.Column<DateTime>(type: "TEXT", nullable: false),
-                    ValorAnterior = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    ValorNuevo = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    ValorAnterior = table.Column<string>(type: "TEXT", nullable: true),
+                    ValorNuevo = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {

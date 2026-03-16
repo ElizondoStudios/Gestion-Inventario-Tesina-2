@@ -4,6 +4,7 @@ import { usuariosApi, rolesApi, sucursalesApi } from '../services/api';
 import type { UsuarioDto, RolDto, UsuarioDetalleDto, SucursalDto } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { hasPermission } from '../utils/permissions';
+import { Dialog, DialogContent } from './ui/dialog';
 
 export function Usuarios() {
   const { user } = useAuth();
@@ -355,9 +356,14 @@ export function Usuarios() {
       </div>
 
       {/* Modal de creación/edición */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
+      <Dialog
+        open={showModal}
+        onOpenChange={(open) => {
+          setShowModal(open);
+          if (!open) setEditingUser(null);
+        }}
+      >
+        <DialogContent className="max-w-md w-full p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">
               {editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}
             </h2>
@@ -449,14 +455,22 @@ export function Usuarios() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de asignación de sucursales */}
-      {showSucursalesModal && selectedUserDetalle && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-lg w-full p-6">
+      <Dialog
+        open={showSucursalesModal && !!selectedUserDetalle}
+        onOpenChange={(open) => {
+          setShowSucursalesModal(open);
+          if (!open) {
+            setSelectedUserDetalle(null);
+            setIdSucursalToAssign(0);
+          }
+        }}
+      >
+        {selectedUserDetalle && (
+          <DialogContent className="max-w-lg w-full p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-2">
               Sucursales de {selectedUserDetalle.nombre}
             </h2>
@@ -533,9 +547,9 @@ export function Usuarios() {
                 Cerrar
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          </DialogContent>
+        )}
+      </Dialog>
     </div>
   );
 }

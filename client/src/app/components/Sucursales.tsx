@@ -4,6 +4,7 @@ import type { SucursalDto } from '../types';
 import { Building2, Plus, Search, Edit2, Trash2, MapPin, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { hasPermission } from '../utils/permissions';
+import { Dialog, DialogContent } from './ui/dialog';
 
 export function Sucursales() {
   const { user } = useAuth();
@@ -238,9 +239,14 @@ export function Sucursales() {
       )}
 
       {/* Modal de creación/edición */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
+      <Dialog
+        open={showModal}
+        onOpenChange={(open) => {
+          setShowModal(open);
+          if (!open) setEditingSucursal(null);
+        }}
+      >
+        <DialogContent className="max-w-md w-full p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">
               {editingSucursal ? 'Editar Sucursal' : 'Nueva Sucursal'}
             </h2>
@@ -325,9 +331,8 @@ export function Sucursales() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

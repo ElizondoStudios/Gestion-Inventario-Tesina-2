@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
+import { Dialog, DialogContent } from './ui/dialog';
 
 export function Inventarios() {
   const { user } = useAuth();
@@ -611,9 +612,14 @@ export function Inventarios() {
       </div>
 
       {/* Modal de producto */}
-      {showProductModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+      <Dialog
+        open={showProductModal}
+        onOpenChange={(open) => {
+          setShowProductModal(open);
+          if (!open) setEditingProduct(null);
+        }}
+      >
+        <DialogContent className="max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold text-gray-900 mb-4">
               {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
             </h2>
@@ -706,14 +712,12 @@ export function Inventarios() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de movimiento */}
-      {showMovementModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
+      <Dialog open={showMovementModal} onOpenChange={setShowMovementModal}>
+        <DialogContent className="max-w-md w-full p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">
               Registrar Movimiento
             </h2>
@@ -901,9 +905,8 @@ export function Inventarios() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

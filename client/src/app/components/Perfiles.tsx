@@ -4,6 +4,7 @@ import type { RolDto, RolDetalleDto, RolModuloPermisoDto } from '../types';
 import { Shield, Plus, Edit2, Trash2, Check, X, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { hasPermission } from '../utils/permissions';
+import { Dialog, DialogContent } from './ui/dialog';
 
 export function Perfiles() {
   const { user } = useAuth();
@@ -277,9 +278,14 @@ export function Perfiles() {
       </div>
 
       {/* Modal de creación/edición */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+      <Dialog
+        open={showModal}
+        onOpenChange={(open) => {
+          setShowModal(open);
+          if (!open) setEditingRol(null);
+        }}
+      >
+        <DialogContent className="max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold text-gray-900 mb-4">
               {editingRol ? 'Editar Perfil' : 'Nuevo Perfil'}
             </h2>
@@ -333,9 +339,8 @@ export function Perfiles() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

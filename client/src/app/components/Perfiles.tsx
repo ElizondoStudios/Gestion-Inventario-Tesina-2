@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react';
 import { rolesApi } from '../services/api';
 import type { RolDto, RolDetalleDto, RolModuloPermisoDto } from '../types';
 import { Shield, Plus, Edit2, Trash2, Check, X, Loader2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { hasPermission } from '../utils/permissions';
 
 export function Perfiles() {
+  const { user } = useAuth();
   const [roles, setRoles] = useState<RolDto[]>([]);
   const [rolesDetalle, setRolesDetalle] = useState<Record<number, RolDetalleDto>>({});
   const [showModal, setShowModal] = useState(false);
@@ -14,6 +17,18 @@ export function Perfiles() {
   const [formData, setFormData] = useState({
     nombre: '',
     descripcion: '',
+  });
+
+  const canWriteRoles = hasPermission(user, {
+    modulo: 'Seguridad',
+    categoria: 'Roles y Permisos',
+    accion: 'escribir',
+  });
+
+  const canDeleteRoles = hasPermission(user, {
+    modulo: 'Seguridad',
+    categoria: 'Roles y Permisos',
+    accion: 'eliminar',
   });
 
   useEffect(() => {
@@ -46,6 +61,11 @@ export function Perfiles() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canWriteRoles) {
+      alert('No tienes permisos para crear o editar perfiles.');
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -80,6 +100,11 @@ export function Perfiles() {
   };
 
   const handleEdit = (rol: RolDto) => {
+    if (!canWriteRoles) {
+      alert('No tienes permisos para editar perfiles.');
+      return;
+    }
+
     setEditingRol(rol);
     setFormData({
       nombre: rol.nombre,
@@ -89,6 +114,11 @@ export function Perfiles() {
   };
 
   const handleDelete = async (rolId: number) => {
+    if (!canDeleteRoles) {
+      alert('No tienes permisos para eliminar perfiles.');
+      return;
+    }
+
     if (confirm('¿Estás seguro de que deseas eliminar este perfil?')) {
       try {
         await rolesApi.delete(rolId);
@@ -130,11 +160,17 @@ export function Perfiles() {
         </div>
         <button
           onClick={() => {
+            if (!canWriteRoles) {
+              alert('No tienes permisos para crear perfiles.');
+              return;
+            }
+
             setEditingRol(null);
             resetForm();
             setShowModal(true);
           }}
-          className="flex items-center gap-2 px-4 py-2 bg-teal-300 hover:bg-teal-400 text-white rounded-lg transition"
+          disabled={!canWriteRoles}
+          className="flex items-center gap-2 px-4 py-2 bg-teal-300 hover:bg-teal-400 text-white rounded-lg transition disabled:opacity-50"
         >
           <Plus className="w-5 h-5" />
           Nuevo Perfil
@@ -166,13 +202,15 @@ export function Perfiles() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleEdit(rol)}
-                    className="text-teal-600 hover:text-teal-900"
+                    disabled={!canWriteRoles}
+                    className="text-teal-600 hover:text-teal-900 disabled:opacity-40"
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(rol.idRol)}
-                    className="text-red-600 hover:text-red-900"
+                    disabled={!canDeleteRoles}
+                    className="text-red-600 hover:text-red-900 disabled:opacity-40"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -288,7 +326,7 @@ export function Perfiles() {
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={saving || !canWriteRoles}
                   className="flex-1 px-4 py-2 bg-teal-300 hover:bg-teal-400 text-white rounded-lg transition disabled:opacity-50"
                 >
                   {saving ? 'Guardando...' : editingRol ? 'Actualizar' : 'Crear'}

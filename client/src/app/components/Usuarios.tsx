@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react';
 import { UserPlus, Search, Edit2, Trash2, UserCheck, UserX, Loader2, Building2, Plus, X } from 'lucide-react';
 import { usuariosApi, rolesApi, sucursalesApi } from '../services/api';
 import type { UsuarioDto, RolDto, UsuarioDetalleDto, SucursalDto } from '../types';
+import { useAuth } from '../context/AuthContext';
+import { hasPermission } from '../utils/permissions';
 
 export function Usuarios() {
+  const { user } = useAuth();
   const [usuarios, setUsuarios] = useState<UsuarioDto[]>([]);
   const [roles, setRoles] = useState<RolDto[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,6 +25,18 @@ export function Usuarios() {
     correo: '',
     contrasenia: '',
     idRol: 0,
+  });
+
+  const canWriteUsuarios = hasPermission(user, {
+    modulo: 'Seguridad',
+    categoria: 'Usuarios',
+    accion: 'escribir',
+  });
+
+  const canDeleteUsuarios = hasPermission(user, {
+    modulo: 'Seguridad',
+    categoria: 'Usuarios',
+    accion: 'eliminar',
   });
 
   useEffect(() => {
@@ -52,6 +67,11 @@ export function Usuarios() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canWriteUsuarios) {
+      alert('No tienes permisos para crear o editar usuarios.');
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -81,6 +101,11 @@ export function Usuarios() {
   };
 
   const handleEdit = (user: UsuarioDto) => {
+    if (!canWriteUsuarios) {
+      alert('No tienes permisos para editar usuarios.');
+      return;
+    }
+
     setEditingUser(user);
     setFormData({
       nombre: user.nombre,
@@ -92,6 +117,11 @@ export function Usuarios() {
   };
 
   const handleDelete = async (userId: number) => {
+    if (!canDeleteUsuarios) {
+      alert('No tienes permisos para desactivar usuarios.');
+      return;
+    }
+
     if (confirm('¿Estás seguro de que deseas desactivar este usuario?')) {
       try {
         await usuariosApi.desactivar(userId);
@@ -103,6 +133,11 @@ export function Usuarios() {
   };
 
   const openSucursalesModal = async (userId: number) => {
+    if (!canWriteUsuarios) {
+      alert('No tienes permisos para asignar sucursales a usuarios.');
+      return;
+    }
+
     try {
       setLoadingSucursales(true);
       const [userDetalle, sucursales] = await Promise.all([
@@ -128,6 +163,11 @@ export function Usuarios() {
   };
 
   const handleAsignarSucursal = async () => {
+    if (!canWriteUsuarios) {
+      alert('No tienes permisos para asignar sucursales a usuarios.');
+      return;
+    }
+
     if (!selectedUserDetalle || idSucursalToAssign === 0) return;
 
     setSaving(true);
@@ -145,6 +185,11 @@ export function Usuarios() {
   };
 
   const handleRemoverSucursal = async (idSucursal: number) => {
+    if (!canWriteUsuarios) {
+      alert('No tienes permisos para remover sucursales de usuarios.');
+      return;
+    }
+
     if (!selectedUserDetalle) return;
 
     setSaving(true);
@@ -178,6 +223,11 @@ export function Usuarios() {
         </div>
         <button
           onClick={() => {
+            if (!canWriteUsuarios) {
+              alert('No tienes permisos para crear usuarios.');
+              return;
+            }
+
             setEditingUser(null);
             setFormData({
               nombre: '',
@@ -187,7 +237,8 @@ export function Usuarios() {
             });
             setShowModal(true);
           }}
-          className="flex items-center gap-2 px-4 py-2 bg-teal-300 hover:bg-teal-400 text-white rounded-lg transition"
+          disabled={!canWriteUsuarios}
+          className="flex items-center gap-2 px-4 py-2 bg-teal-300 hover:bg-teal-400 text-white rounded-lg transition disabled:opacity-50"
         >
           <UserPlus className="w-5 h-5" />
           Nuevo Usuario
@@ -275,20 +326,23 @@ export function Usuarios() {
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
                       onClick={() => openSucursalesModal(usuario.idUsuario)}
-                      className="text-indigo-600 hover:text-indigo-900 mr-3"
+                      disabled={!canWriteUsuarios}
+                      className="text-indigo-600 hover:text-indigo-900 mr-3 disabled:opacity-40"
                       title="Asignar sucursales"
                     >
                       <Building2 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleEdit(usuario)}
-                      className="text-teal-600 hover:text-teal-900 mr-3"
+                      disabled={!canWriteUsuarios}
+                      className="text-teal-600 hover:text-teal-900 mr-3 disabled:opacity-40"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(usuario.idUsuario)}
-                      className="text-red-600 hover:text-red-900"
+                      disabled={!canDeleteUsuarios}
+                      className="text-red-600 hover:text-red-900 disabled:opacity-40"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -388,7 +442,7 @@ export function Usuarios() {
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={saving || !canWriteUsuarios}
                   className="flex-1 px-4 py-2 bg-teal-300 hover:bg-teal-400 text-white rounded-lg transition disabled:opacity-50"
                 >
                   {saving ? 'Guardando...' : editingUser ? 'Actualizar' : 'Crear'}
@@ -429,7 +483,7 @@ export function Usuarios() {
               <button
                 type="button"
                 onClick={handleAsignarSucursal}
-                disabled={saving || idSucursalToAssign === 0}
+                disabled={saving || idSucursalToAssign === 0 || !canWriteUsuarios}
                 className="px-3 py-2 bg-teal-300 hover:bg-teal-400 text-white rounded-lg disabled:opacity-50"
                 title="Asignar"
               >
@@ -456,7 +510,7 @@ export function Usuarios() {
                   <button
                     type="button"
                     onClick={() => handleRemoverSucursal(sucursal.idSucursal)}
-                    disabled={saving}
+                    disabled={saving || !canWriteUsuarios}
                     className="text-red-600 hover:text-red-900 disabled:opacity-50"
                     title="Remover asignación"
                   >

@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react';
 import { sucursalesApi } from '../services/api';
 import type { SucursalDto } from '../types';
 import { Building2, Plus, Search, Edit2, Trash2, MapPin, Loader2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { hasPermission } from '../utils/permissions';
 
 export function Sucursales() {
+  const { user } = useAuth();
   const [sucursales, setSucursales] = useState<SucursalDto[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -16,6 +19,18 @@ export function Sucursales() {
     direccion: '',
     ciudad: '',
     estado: '',
+  });
+
+  const canWriteSucursales = hasPermission(user, {
+    modulo: 'Inventario',
+    categoria: 'Inventarios',
+    accion: 'escribir',
+  });
+
+  const canDeleteSucursales = hasPermission(user, {
+    modulo: 'Inventario',
+    categoria: 'Inventarios',
+    accion: 'eliminar',
   });
 
   useEffect(() => {
@@ -42,6 +57,11 @@ export function Sucursales() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canWriteSucursales) {
+      alert('No tienes permisos para crear o editar sucursales.');
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -72,6 +92,11 @@ export function Sucursales() {
   };
 
   const handleEdit = (sucursal: SucursalDto) => {
+    if (!canWriteSucursales) {
+      alert('No tienes permisos para editar sucursales.');
+      return;
+    }
+
     setEditingSucursal(sucursal);
     setFormData({
       nombre: sucursal.nombre,
@@ -83,6 +108,11 @@ export function Sucursales() {
   };
 
   const handleDelete = async (sucursalId: number) => {
+    if (!canDeleteSucursales) {
+      alert('No tienes permisos para desactivar sucursales.');
+      return;
+    }
+
     if (confirm('¿Estás seguro de que deseas desactivar esta sucursal?')) {
       try {
         await sucursalesApi.desactivar(sucursalId);
@@ -113,11 +143,17 @@ export function Sucursales() {
         </div>
         <button
           onClick={() => {
+            if (!canWriteSucursales) {
+              alert('No tienes permisos para crear sucursales.');
+              return;
+            }
+
             setEditingSucursal(null);
             resetForm();
             setShowModal(true);
           }}
-          className="flex items-center gap-2 px-4 py-2 bg-teal-300 hover:bg-teal-400 text-white rounded-lg transition"
+          disabled={!canWriteSucursales}
+          className="flex items-center gap-2 px-4 py-2 bg-teal-300 hover:bg-teal-400 text-white rounded-lg transition disabled:opacity-50"
         >
           <Plus className="w-5 h-5" />
           Nueva Sucursal
@@ -166,13 +202,15 @@ export function Sucursales() {
               <div className="flex gap-2">
                 <button
                   onClick={() => handleEdit(sucursal)}
-                  className="text-teal-600 hover:text-teal-900"
+                  disabled={!canWriteSucursales}
+                  className="text-teal-600 hover:text-teal-900 disabled:opacity-40"
                 >
                   <Edit2 className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => handleDelete(sucursal.idSucursal)}
-                  className="text-red-600 hover:text-red-900"
+                  disabled={!canDeleteSucursales}
+                  className="text-red-600 hover:text-red-900 disabled:opacity-40"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -280,7 +318,7 @@ export function Sucursales() {
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={saving || !canWriteSucursales}
                   className="flex-1 px-4 py-2 bg-teal-300 hover:bg-teal-400 text-white rounded-lg transition disabled:opacity-50"
                 >
                   {saving ? 'Guardando...' : editingSucursal ? 'Actualizar' : 'Crear'}

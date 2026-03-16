@@ -27,19 +27,53 @@ export const router = createBrowserRouter([
       },
       {
         path: 'usuarios',
-        element: <Usuarios />,
+        element: (
+          <ProtectedRoute
+            requiredAny={[
+              { modulo: 'Seguridad', categoria: 'Usuarios', accion: 'leer' },
+            ]}
+          >
+            <Usuarios />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'perfiles',
-        element: <Perfiles />,
+        element: (
+          <ProtectedRoute
+            requiredAny={[
+              { modulo: 'Seguridad', categoria: 'Roles y Permisos', accion: 'leer' },
+            ]}
+          >
+            <Perfiles />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'sucursales',
-        element: <Sucursales />,
+        element: (
+          <ProtectedRoute
+            requiredAny={[
+              { modulo: 'Inventario', categoria: 'Inventarios', accion: 'leer' },
+            ]}
+          >
+            <Sucursales />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'inventarios',
-        element: <Inventarios />,
+        element: (
+          <ProtectedRoute
+            requiredAny={[
+              { modulo: 'Inventario', categoria: 'Productos', accion: 'leer' },
+              { modulo: 'Inventario', categoria: 'Inventarios', accion: 'leer' },
+              { modulo: 'Inventario', categoria: 'Movimientos', accion: 'leer' },
+            ]}
+          >
+            <Inventarios />
+          </ProtectedRoute>
+        ),
       },
     ],
   },

@@ -11,19 +11,50 @@ import {
   Menu,
   X,
 } from 'lucide-react';
+import { hasAnyPermission, type PermissionRequirement } from '../utils/permissions';
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Usuarios', href: '/usuarios', icon: Users },
-  { name: 'Perfiles de Puesto', href: '/perfiles', icon: Shield },
-  { name: 'Sucursales', href: '/sucursales', icon: Building2 },
-  { name: 'Inventarios', href: '/inventarios', icon: Package },
+  {
+    name: 'Dashboard',
+    href: '/',
+    icon: LayoutDashboard,
+    requiredAny: [{ modulo: 'Dashboard', categoria: 'Vista General', accion: 'leer' }] as PermissionRequirement[],
+  },
+  {
+    name: 'Usuarios',
+    href: '/usuarios',
+    icon: Users,
+    requiredAny: [{ modulo: 'Seguridad', categoria: 'Usuarios', accion: 'leer' }] as PermissionRequirement[],
+  },
+  {
+    name: 'Perfiles de Puesto',
+    href: '/perfiles',
+    icon: Shield,
+    requiredAny: [{ modulo: 'Seguridad', categoria: 'Roles y Permisos', accion: 'leer' }] as PermissionRequirement[],
+  },
+  {
+    name: 'Sucursales',
+    href: '/sucursales',
+    icon: Building2,
+    requiredAny: [{ modulo: 'Inventario', categoria: 'Inventarios', accion: 'leer' }] as PermissionRequirement[],
+  },
+  {
+    name: 'Inventarios',
+    href: '/inventarios',
+    icon: Package,
+    requiredAny: [
+      { modulo: 'Inventario', categoria: 'Productos', accion: 'leer' },
+      { modulo: 'Inventario', categoria: 'Inventarios', accion: 'leer' },
+      { modulo: 'Inventario', categoria: 'Movimientos', accion: 'leer' },
+    ] as PermissionRequirement[],
+  },
 ];
 
 export function Layout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const visibleNavigation = navigation.filter((item) => hasAnyPermission(user, item.requiredAny));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -82,7 +113,7 @@ export function Layout() {
 
           {/* Navegación */}
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-            {navigation.map((item) => {
+            {visibleNavigation.map((item) => {
               const isActive = location.pathname === item.href;
               return (
                 <Link
